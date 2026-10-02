@@ -104,6 +104,11 @@ export const StatusTimeline = ({ timeline = [], className = '' }) => {
                     {entry.title}
                   </h4>
                   <StatusBadge status={entry.status} size="sm" />
+                  {entry.isInternal && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                      Internal Only
+                    </span>
+                  )}
                 </div>
                 <span className="text-[11px] text-slate-400 font-mono">
                   {formatDate(entry.createdAt)}
@@ -111,7 +116,7 @@ export const StatusTimeline = ({ timeline = [], className = '' }) => {
               </div>
 
               {entry.note && (
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mt-1 whitespace-pre-line">
                   {entry.note}
                 </p>
               )}
@@ -119,8 +124,8 @@ export const StatusTimeline = ({ timeline = [], className = '' }) => {
               {entry.actorRole && (
                 <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
                   <span>Action by:</span>
-                  <span className="px-1.5 py-0.2 rounded bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">
-                    {entry.actorRole}
+                  <span className="px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">
+                    {entry.actor?.name ? `${entry.actor.name} (${entry.actorRole})` : entry.actorRole}
                   </span>
                 </div>
               )}

@@ -52,6 +52,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 import path from 'path';
 import { fileURLToPath } from 'url';
 import grievanceRoutes from './routes/grievanceRoutes.js';
+import officerRoutes from './routes/officerRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,6 +74,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Mount API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/grievances', grievanceRoutes);
+app.use('/api/officer', officerRoutes);
 
 // 404 Handler for undefined routes
 app.use(notFound);

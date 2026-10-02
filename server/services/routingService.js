@@ -85,9 +85,48 @@ export const routeGrievance = async (category, preferredDeptCode = null) => {
       chosenOfficer = officer;
     }
   }
-
   return {
     department: dept,
     assignedOfficer: chosenOfficer,
   };
+};
+
+/**
+ * Finds the active officer with the lowest open workload in a given department.
+ * @param {string|ObjectId} departmentId
+ * @returns {Promise<Object|null>}
+ */
+export const findLeastLoadedOfficer = async (departmentId) => {
+  const officers = await User.find({
+    role: 'officer',
+    department: departmentId,
+    isActive: true,
+  });
+
+  if (!officers || officers.length === 0) return null;
+
+  const openStatuses = ['Submitted', 'AI Classified', 'Assigned', 'In Progress', 'Awaiting Verification', 'Escalated'];
+
+  let chosenOfficer = officers[0];
+  let minWorkload = Infinity;
+
+  for (const officer of officers) {
+    const activeCount = await Grievance.countDocuments({
+      assignedOfficer: officer._id,
+      status: { $in: openStatuses },
+    });
+
+    if (activeCount < minWorkload) {
+      minWorkload = activeCount;
+      chosenOfficer = officer;
+    }
+  }
+
+  return chosenOfficer;
+};
+
+export default {
+  matchDepartmentCode,
+  routeGrievance,
+  findLeastLoadedOfficer,
 };

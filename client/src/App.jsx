@@ -38,6 +38,7 @@ import {
   OfficerAssigned,
   OfficerStats,
   OfficerNotifications,
+  GrievanceWorkbench,
 } from './pages/dashboard/OfficerPages';
 
 // Dashboard Views - Admin
@@ -88,6 +89,7 @@ export function App() {
                   <Route element={<RoleRoute allowedRoles={['officer', 'admin']} />}>
                     <Route path="officer" element={<OfficerDashboard />} />
                     <Route path="officer/assigned" element={<OfficerAssigned />} />
+                    <Route path="officer/workbench/:id" element={<GrievanceWorkbench />} />
                     <Route path="officer/stats" element={<OfficerStats />} />
                     <Route path="officer/notifications" element={<OfficerNotifications />} />
                   </Route>

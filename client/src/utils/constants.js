@@ -22,6 +22,17 @@ export const STATUSES = [
   'Escalated'
 ];
 
+export const ALLOWED_TRANSITIONS = {
+  'Submitted': ['AI Classified', 'Assigned'],
+  'AI Classified': ['Assigned'],
+  'Assigned': ['In Progress', 'Escalated'],
+  'In Progress': ['Awaiting Verification', 'Escalated'],
+  'Awaiting Verification': ['Resolved', 'In Progress'],
+  'Resolved': ['Closed', 'In Progress'],
+  'Closed': [],
+  'Escalated': ['In Progress', 'Assigned']
+};
+
 export const STATUS_CONFIG = {
   'Submitted': {
     label: 'Submitted',

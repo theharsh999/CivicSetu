@@ -275,21 +275,70 @@ export const GrievanceDetail = () => {
             )}
           </Card>
 
-          {/* PROMPT 7 PLACEHOLDER: Field Resolution Proof */}
-          <div className="p-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 text-xs text-slate-500 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-              <FileCheck2 className="w-4 h-4" />
-            </div>
-            <div>
-              <h5 className="font-semibold text-slate-800 dark:text-slate-200">
-                Officer Field Resolution Proof (Prompt 7 Verification Pipeline)
-              </h5>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Once field work is executed, before/after photographs and closing notes submitted by the assigned engineer will be displayed here for citizen verification.
-              </p>
-            </div>
-          </div>
+          {/* Field Resolution Summary & Proof (Displayed when resolved or closed) */}
+          {grievance.resolution?.summary ? (
+            <Card className="p-5 border-l-4 border-l-emerald-600 bg-emerald-50/20 dark:bg-emerald-950/10">
+              <CardHeader className="p-0 pb-3 mb-3 border-b border-emerald-100 dark:border-emerald-900/40 flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-1.5 text-emerald-800 dark:text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Municipal Resolution & Proof Report</span>
+                </CardTitle>
+                {grievance.resolution.resolvedAt && (
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {formatDate(grievance.resolution.resolvedAt)}
+                  </span>
+                )}
+              </CardHeader>
 
+              <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 whitespace-pre-line leading-relaxed">
+                {grievance.resolution.summary}
+              </p>
+
+              {grievance.resolution.proofImages && grievance.resolution.proofImages.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-2">
+                    Official Work Execution Proof ({grievance.resolution.proofImages.length}):
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {grievance.resolution.proofImages.map((imgUrl, i) => {
+                      const fullProof = imgUrl.startsWith('http') ? imgUrl : `${backendBase}${imgUrl}`;
+                      return (
+                        <div
+                          key={i}
+                          onClick={() => setActiveImage(fullProof)}
+                          className="cursor-pointer rounded-xl overflow-hidden aspect-video border border-slate-200 dark:border-slate-700 relative group shadow-sm"
+                        >
+                          <img
+                            src={fullProof}
+                            alt="Resolution proof"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                            <Maximize2 className="w-5 h-5" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </Card>
+          ) : (
+            /* PROMPT 7 PLACEHOLDER: Field Resolution Proof */
+            <div className="p-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 text-xs text-slate-500 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <FileCheck2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h5 className="font-semibold text-slate-800 dark:text-slate-200">
+                  Officer Field Resolution Proof (Awaiting Completion)
+                </h5>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Once field repair work is completed, before/after photographs and closing notes submitted by the assigned nodal officer will appear here.
+                </p>
+              </div>
+            </div>
+          )}
           {/* PROMPT 7 PLACEHOLDER: Citizen Feedback */}
           <div className="p-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 text-xs text-slate-500 flex items-start gap-3">
             <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">

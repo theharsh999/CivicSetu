@@ -49,3 +49,5 @@ export const uploadGrievanceImages = multer({
   },
   fileFilter,
 });
+
+export default uploadGrievanceImages;
