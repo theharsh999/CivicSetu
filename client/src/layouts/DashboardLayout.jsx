@@ -21,9 +21,9 @@ import {
   Users,
   LogOut,
   Shield,
-  UserCheck,
   User,
-  ExternalLink
+  ExternalLink,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -58,6 +58,7 @@ export const ROLE_NAV_CONFIG = {
     items: [
       { label: 'Dashboard', path: '/dashboard/admin', icon: LayoutDashboard },
       { label: 'All Grievances', path: '/dashboard/admin/grievances', icon: FileText },
+      { label: 'Escalated & Overdue', path: '/dashboard/admin/escalated', icon: AlertTriangle },
       { label: 'Analytics', path: '/dashboard/admin/analytics', icon: BarChart3 },
       { label: 'Map View', path: '/dashboard/admin/map', icon: MapPin },
       { label: 'Departments', path: '/dashboard/admin/departments', icon: FolderTree },

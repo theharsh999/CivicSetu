@@ -54,6 +54,7 @@ import { fileURLToPath } from 'url';
 import grievanceRoutes from './routes/grievanceRoutes.js';
 import officerRoutes from './routes/officerRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,6 +78,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/grievances', grievanceRoutes);
 app.use('/api/officer', officerRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 Handler for undefined routes
 app.use(notFound);

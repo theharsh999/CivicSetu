@@ -45,6 +45,7 @@ import {
 import {
   AdminDashboard,
   AdminGrievances,
+  AdminEscalated,
   AdminAnalytics,
   AdminMap,
   AdminDepartments,
@@ -98,6 +99,7 @@ export function App() {
                   <Route element={<RoleRoute allowedRoles={['admin']} />}>
                     <Route path="admin" element={<AdminDashboard />} />
                     <Route path="admin/grievances" element={<AdminGrievances />} />
+                    <Route path="admin/escalated" element={<AdminEscalated />} />
                     <Route path="admin/analytics" element={<AdminAnalytics />} />
                     <Route path="admin/map" element={<AdminMap />} />
                     <Route path="admin/departments" element={<AdminDepartments />} />
