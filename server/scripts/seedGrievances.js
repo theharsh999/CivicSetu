@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import Department from '../models/Department.js';
 import User from '../models/User.js';
 import Grievance from '../models/Grievance.js';
+import { analyzeGrievance } from '../services/ai/aiService.js';
 import { DEPARTMENTS, SLA_HOURS, PRIORITIES } from '../utils/constants.js';
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/civicsetu';
@@ -584,6 +585,50 @@ const seedGrievances = async () => {
         dueAt = new Date(createdAt.getTime() + (hoursAllowed * 3600 * 1000));
       }
 
+      // Run deterministic AI analysis on description
+      const aiResult = await analyzeGrievance({
+        title: t.title,
+        description: t.description,
+        location: {
+          address: locality.address,
+          ward: locality.ward,
+          landmark: locality.landmark,
+          coordinates: geo,
+        },
+      });
+
+      // A few officer-overridden examples (indices 3 and 17)
+      const isOverridden = i === 3 || i === 17;
+      const overriddenBy = isOverridden ? assignedOfficer._id : null;
+      const overriddenAt = isOverridden ? new Date(createdAt.getTime() + 2 * 3600 * 1000) : null;
+      const overrideReason = isOverridden
+        ? `Officer reassigned category to "${t.category}" following physical ground inspection.`
+        : '';
+
+      // A few needsManualReview examples (indices 7 and 25)
+      const needsReview = Boolean(aiResult.needsManualReview || i === 7 || i === 25);
+      const calibratedConfidence = (i === 7 || i === 25) ? 0.62 : aiResult.confidence;
+
+      const aiAnalysisDoc = {
+        department: aiResult.department,
+        category: aiResult.category,
+        priority: aiResult.priority,
+        confidence: calibratedConfidence,
+        keywords: aiResult.keywords || [],
+        urgencySignals: aiResult.urgencySignals || [],
+        summary: aiResult.summary || '',
+        reasoning: aiResult.reasoning || '',
+        alternatives: aiResult.alternatives || [],
+        provider: aiResult.provider || 'rule-based-nlp-v1',
+        isMock: true,
+        needsManualReview: needsReview,
+        analyzedAt: new Date(createdAt.getTime() + 1000),
+        overridden: isOverridden,
+        overriddenBy,
+        overriddenAt,
+        overrideReason,
+      };
+
       // Build coherent timeline based on status
       const timeline = [];
       const t0 = new Date(createdAt.getTime());
@@ -596,6 +641,30 @@ const seedGrievances = async () => {
         isInternal: false,
         createdAt: t0,
       });
+
+      // AI Classified timeline entry
+      const confPercent = Math.round(aiAnalysisDoc.confidence * 100);
+      timeline.push({
+        status: 'AI Classified',
+        title: `AI analysis completed: ${aiAnalysisDoc.department} / ${aiAnalysisDoc.category} / ${aiAnalysisDoc.priority} (${confPercent}%)`,
+        note: aiAnalysisDoc.reasoning || `Classified into ${aiAnalysisDoc.category} with ${confPercent}% confidence.`,
+        actor: null,
+        actorRole: 'system',
+        isInternal: false,
+        createdAt: new Date(t0.getTime() + 2 * 60 * 1000),
+      });
+
+      if (isOverridden) {
+        timeline.push({
+          status: 'Assigned',
+          title: 'Category Corrected by Officer',
+          note: overrideReason,
+          actor: assignedOfficer._id,
+          actorRole: 'officer',
+          isInternal: false,
+          createdAt: overriddenAt,
+        });
+      }
 
       if (t.status !== 'Submitted') {
         const t1 = new Date(t0.getTime() + 15 * 60 * 1000); // 15 mins later
@@ -733,9 +802,10 @@ const seedGrievances = async () => {
         citizen: citizen._id,
         category: t.category,
         department: dept._id,
-        categorySource: 'citizen',
+        categorySource: isOverridden ? 'officer' : (aiResult.category === t.category ? 'ai' : 'citizen'),
         priority: t.priority,
         status: t.status,
+        aiAnalysis: aiAnalysisDoc,
         location: {
           address: locality.address,
           ward: locality.ward,

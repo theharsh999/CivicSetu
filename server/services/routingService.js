@@ -125,8 +125,97 @@ export const findLeastLoadedOfficer = async (departmentId) => {
   return chosenOfficer;
 };
 
+/**
+ * Determines final category, department, priority, SLA due date, and officer assignment
+ * combining citizen input with AI analysis results per platform governance rules.
+ *
+ * Rules:
+ * 1. If citizen selected "Not sure" -> Always route using AI analysis result (source: 'ai').
+ * 2. If AI confidence >= 0.75 and citizen choice disagrees -> AI overrides (source: 'ai').
+ * 3. Else -> Respect citizen's choice (source: 'citizen').
+ * 4. Priority and SLA target are calibrated from the AI analysis.
+ *
+ * @param {Object} params
+ * @param {string} params.citizenCategory
+ * @param {string} [params.citizenDeptCode]
+ * @param {string} [params.citizenPriority]
+ * @param {Object} params.aiAnalysis
+ * @returns {Promise<Object>}
+ */
+export const routeGrievanceWithAI = async ({
+  citizenCategory = '',
+  citizenDeptCode = null,
+  citizenPriority = 'Medium',
+  aiAnalysis = {},
+}) => {
+  const isNotSure =
+    !citizenCategory ||
+    citizenCategory === 'Not sure' ||
+    citizenCategory === 'Other / Not sure';
+
+  const citizenDept = citizenDeptCode || matchDepartmentCode(citizenCategory);
+
+  const disagrees =
+    !isNotSure &&
+    (citizenCategory.trim().toLowerCase() !== aiAnalysis.category?.toLowerCase() ||
+      citizenDept !== aiAnalysis.department);
+
+  let finalCategory = citizenCategory;
+  let finalDeptCode = citizenDept;
+  let categorySource = 'citizen';
+  let routingReason = '';
+
+  if (isNotSure) {
+    finalCategory = aiAnalysis.category || 'General Complaint';
+    finalDeptCode = aiAnalysis.department || 'OTHER';
+    categorySource = 'ai';
+    routingReason = 'Auto-routed via AI classification (citizen opted for automated detection)';
+  } else if (aiAnalysis.confidence >= 0.75 && disagrees) {
+    finalCategory = aiAnalysis.category;
+    finalDeptCode = aiAnalysis.department;
+    categorySource = 'ai';
+    routingReason = `AI confidence (${Math.round(aiAnalysis.confidence * 100)}%) exceeded override threshold (75%)`;
+  } else {
+    finalCategory = citizenCategory;
+    finalDeptCode = citizenDept || aiAnalysis.department || 'OTHER';
+    categorySource = 'citizen';
+    routingReason = 'Citizen selection respected';
+  }
+
+  // Priority estimation: AI priority takes precedence when confidence is acceptable
+  const finalPriority =
+    aiAnalysis.confidence >= 0.65
+      ? aiAnalysis.priority || 'Medium'
+      : citizenPriority || 'Medium';
+
+  // Compute SLA target
+  const hours = SLA_HOURS[finalPriority] || 96;
+  const dueAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+
+  // Department lookup
+  let deptDoc = await Department.findOne({ code: finalDeptCode, isActive: true });
+  if (!deptDoc) {
+    deptDoc = await Department.findOne({ code: 'OTHER' });
+  }
+
+  // Officer assignment
+  const assignedOfficer = deptDoc ? await findLeastLoadedOfficer(deptDoc._id) : null;
+
+  return {
+    department: deptDoc,
+    departmentCode: finalDeptCode,
+    category: finalCategory,
+    categorySource,
+    priority: finalPriority,
+    dueAt,
+    assignedOfficer,
+    routingReason,
+  };
+};
+
 export default {
   matchDepartmentCode,
   routeGrievance,
   findLeastLoadedOfficer,
+  routeGrievanceWithAI,
 };

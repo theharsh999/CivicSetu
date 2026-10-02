@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import grievanceService from '../../services/grievanceService';
 import officerService from '../../services/officerService';
+import aiService from '../../services/aiService';
 import { ALLOWED_TRANSITIONS, DEPARTMENTS } from '../../utils/constants';
 import PageHeader from '../../components/ui/PageHeader';
 import Card, { CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -21,6 +22,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import StatusTimeline from '../../components/grievance/StatusTimeline';
 import LocationPicker from '../../components/grievance/LocationPicker';
 import FileUploader from '../../components/grievance/FileUploader';
+import AiAnalysisCard from '../../components/ai/AiAnalysisCard';
 import {
   ArrowLeft,
   Copy,
@@ -58,6 +60,7 @@ export const GrievanceWorkbench = () => {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [activeImage, setActiveImage] = useState(null);
+  const [similarComplaints, setSimilarComplaints] = useState([]);
 
   // Status transition form state
   const [targetStatus, setTargetStatus] = useState('');
@@ -122,6 +125,27 @@ export const GrievanceWorkbench = () => {
   useEffect(() => {
     fetchGrievanceData();
   }, [fetchGrievanceData]);
+
+  // Proactively check for potential duplicate complaints in vicinity
+  useEffect(() => {
+    if (grievance?.title && grievance?.description) {
+      aiService
+        .getSimilar({
+          title: grievance.title,
+          description: grievance.description,
+          departmentCode: grievance.department?.code,
+          lat: grievance.location?.coordinates?.lat,
+          lng: grievance.location?.coordinates?.lng,
+          excludeId: grievance._id,
+        })
+        .then((res) => {
+          setSimilarComplaints(res.similarGrievances || []);
+        })
+        .catch((err) => {
+          console.warn('Could not fetch similar complaints:', err);
+        });
+    }
+  }, [grievance?._id, grievance?.title, grievance?.description, grievance?.department?.code]);
 
   const handleCopyId = () => {
     if (grievance?.trackingId) {
@@ -545,18 +569,72 @@ export const GrievanceWorkbench = () => {
             )}
           </Card>
 
-          {/* AI ANALYSIS PREVIEW PANEL (PLACEHOLDER FOR PROMPT 5) */}
-          <div
-            id="ai-suggestion-workbench-panel"
-            className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-dashed border-indigo-200 dark:border-indigo-900/40 text-xs text-slate-600 dark:text-slate-300 space-y-2"
-          >
-            <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-400 font-bold">
-              <Bot className="w-4 h-4" />
-              <span>AI Automated Triage Suggestion (Prompt 5 Integration)</span>
-            </div>
-            <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-              In Prompt 5, the NLP keyword pipeline will surface confidence scores, extracted municipal entities, and suggested department reassignment directly into this card.
-            </p>
+          {/* AI ANALYSIS CARD & DUPLICATE CANDIDATE PANEL */}
+          <div className="space-y-3">
+            {grievance.aiAnalysis ? (
+              <AiAnalysisCard
+                analysis={grievance.aiAnalysis}
+                isLoading={false}
+              />
+            ) : (
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs text-slate-500">
+                No automated AI classification metadata recorded for this ticket.
+              </div>
+            )}
+
+            {/* DUPLICATE CANDIDATES DETECTED */}
+            {similarComplaints.length > 0 && (
+              <Card className="p-4 border-amber-300 dark:border-amber-800/80 bg-amber-50/50 dark:bg-amber-950/20">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-amber-200 dark:border-amber-900/50">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>Potential Duplicate Complaints Detected ({similarComplaints.length})</span>
+                  </div>
+                  <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded-full">
+                    Within 500m / Same Dept
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {similarComplaints.map((dup) => (
+                    <div
+                      key={dup._id}
+                      className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/40 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-brand-600 dark:text-brand-400">
+                            {dup.trackingId}
+                          </span>
+                          <span className="font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">
+                            {dup.title}
+                          </span>
+                          <StatusBadge status={dup.status} size="sm" />
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                          <span>{dup.category}</span>
+                          {dup.distanceMeters !== null && (
+                            <>
+                              <span>•</span>
+                              <span>~{dup.distanceMeters}m away</span>
+                            </>
+                          )}
+                          <span>•</span>
+                          <span className="font-medium text-amber-600 dark:text-amber-400">
+                            {Math.round((dup.similarityScore || 0) * 100)}% match
+                          </span>
+                        </div>
+                      </div>
+                      <Link
+                        to={`/dashboard/officer/workbench/${dup._id}`}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 shrink-0"
+                      >
+                        Inspect &rarr;
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* Resolution Proof Card (If Resolved or Closed) */}

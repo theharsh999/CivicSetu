@@ -477,10 +477,17 @@ export const correctGrievanceCategory = async (req, res, next) => {
     }
 
     const prevCategory = grievance.category;
-    const prevDeptId = grievance.department?.toString();
-
     grievance.category = category.trim();
     grievance.categorySource = 'officer';
+
+    // Human-in-the-loop: mark AI analysis as overridden by officer
+    if (!grievance.aiAnalysis) {
+      grievance.aiAnalysis = {};
+    }
+    grievance.aiAnalysis.overridden = true;
+    grievance.aiAnalysis.overriddenBy = req.user._id;
+    grievance.aiAnalysis.overriddenAt = new Date();
+    grievance.aiAnalysis.overrideReason = note ? note.trim() : `Officer corrected category to "${category.trim()}"`;
 
     let reRouted = false;
     let newDeptName = '';

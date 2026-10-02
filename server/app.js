@@ -53,6 +53,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import grievanceRoutes from './routes/grievanceRoutes.js';
 import officerRoutes from './routes/officerRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,6 +76,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/grievances', grievanceRoutes);
 app.use('/api/officer', officerRoutes);
+app.use('/api/ai', aiRoutes);
 
 // 404 Handler for undefined routes
 app.use(notFound);

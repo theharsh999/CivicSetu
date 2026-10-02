@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { DEPARTMENTS, PRIORITIES } from '../../utils/constants';
 import grievanceService from '../../services/grievanceService';
+import aiService from '../../services/aiService';
 import PageHeader from '../../components/ui/PageHeader';
 import Card from '../../components/ui/Card';
 import Input from '../../components/ui/Input';
@@ -12,8 +13,10 @@ import Select from '../../components/ui/Select';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import PriorityBadge from '../../components/ui/PriorityBadge';
+import StatusBadge from '../../components/ui/StatusBadge';
 import LocationPicker from '../../components/grievance/LocationPicker';
 import FileUploader from '../../components/grievance/FileUploader';
+import AiAnalysisCard from '../../components/ai/AiAnalysisCard';
 import {
   FileText,
   MapPin,
@@ -30,6 +33,7 @@ import {
   AlertTriangle,
   ArrowRight,
   ShieldCheck,
+  ExternalLink,
 } from 'lucide-react';
 
 export const CitizenLodge = () => {
@@ -58,6 +62,81 @@ export const CitizenLodge = () => {
 
   const [files, setFiles] = useState([]);
   const [errors, setErrors] = useState({});
+
+  // AI Preview & Similarity State
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [similarComplaints, setSimilarComplaints] = useState([]);
+
+  const debounceTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (formData.description.trim().length < 15) {
+      setAiAnalysis(null);
+      setSimilarComplaints([]);
+      setAiError(null);
+      return;
+    }
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(async () => {
+      setIsAiLoading(true);
+      setAiError(null);
+      try {
+        const result = await aiService.analyze({
+          title: formData.title,
+          description: formData.description,
+          location: {
+            address: formData.address,
+            ward: formData.ward,
+            coordinates: {
+              lat: formData.lat,
+              lng: formData.lng,
+            },
+          },
+        });
+        if (result?.analysis) {
+          setAiAnalysis(result.analysis);
+          setSimilarComplaints(result.similarGrievances || []);
+        }
+      } catch (err) {
+        console.warn('AI preview non-blocking error:', err);
+        setAiError('AI preview temporarily unavailable. You can still submit manually.');
+      } finally {
+        setIsAiLoading(false);
+      }
+    }, 700);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [formData.description, formData.title, formData.lat, formData.lng]);
+
+  const handleApplyAiSuggestion = () => {
+    if (!aiAnalysis) return;
+    setFormData((prev) => ({
+      ...prev,
+      department: aiAnalysis.department,
+      category: aiAnalysis.category,
+      priority: aiAnalysis.priority || prev.priority,
+    }));
+    toast.success(`Applied AI recommendation: ${aiAnalysis.category}`, 'AI Suggestion Applied');
+  };
+
+  const handleSelectAlternative = (alt) => {
+    setFormData((prev) => ({
+      ...prev,
+      department: alt.department,
+      category: alt.category,
+    }));
+    toast.info(`Selected alternative category: ${alt.category}`);
+  };
 
   const wards = [
     'Ward 1 - Central',
@@ -408,23 +487,71 @@ export const CitizenLodge = () => {
             </div>
           </div>
 
-          {/* REUSABLE PLACEHOLDER PANEL FOR PROMPT 5 AI PREVIEW */}
-          <div
-            id="ai-analysis-preview-panel"
-            className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-500 flex items-start gap-3"
-          >
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 mt-0.5">
-              <Bot className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 text-indigo-700 dark:text-indigo-300 font-semibold text-xs mb-0.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>AI Automated Triage Preview Area (Prompt 5 Ready)</span>
+          {/* AI REAL-TIME PREVIEW & DUPLICATE DETECTION */}
+          <div className="space-y-3">
+            {(isAiLoading || aiAnalysis || aiError) && (
+              <AiAnalysisCard
+                analysis={aiAnalysis}
+                isLoading={isAiLoading}
+                error={aiError}
+                onApply={handleApplyAiSuggestion}
+                onSelectAlternative={handleSelectAlternative}
+                showApplyButton={Boolean(aiAnalysis && (formData.category !== aiAnalysis.category || formData.department !== aiAnalysis.department))}
+              />
+            )}
+
+            {/* SIMILAR GRIEVANCES / DUPLICATE DETECTION WARNING */}
+            {similarComplaints.length > 0 && (
+              <div className="p-4 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/60 shadow-xs space-y-2.5">
+                <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-semibold text-xs">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>Similar issues already reported nearby (Possible Duplicate)</span>
+                </div>
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                  We found open complaints in this area with similar descriptions. If one matches your issue, track it instead to avoid duplicate work for field squads:
+                </p>
+                <div className="space-y-2 pt-1">
+                  {similarComplaints.map((item) => (
+                    <div
+                      key={item._id}
+                      className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-amber-200/80 dark:border-amber-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[11px] font-bold text-brand-600 dark:text-brand-400">
+                            {item.trackingId}
+                          </span>
+                          <span className="font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">
+                            {item.title}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                          <span>{item.category}</span>
+                          {item.distanceMeters !== null && (
+                            <>
+                              <span>•</span>
+                              <span>~{item.distanceMeters}m away</span>
+                            </>
+                          )}
+                          <span>•</span>
+                          <span className="font-medium text-amber-600 dark:text-amber-400">
+                            {Math.round((item.similarityScore || 0) * 100)}% text similarity
+                          </span>
+                        </div>
+                      </div>
+                      <a
+                        href={`/track?id=${item.trackingId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 shrink-0 self-start sm:self-center"
+                      >
+                        Track Issue <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                In Prompt 5, the NLP classification pipeline will automatically analyze your description here, suggesting the exact municipal category, priority SLA, and confidence score.
-              </p>
-            </div>
+            )}
           </div>
 
           <div className="pt-3 flex justify-end">

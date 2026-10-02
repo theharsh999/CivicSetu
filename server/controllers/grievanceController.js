@@ -2,7 +2,8 @@ import mongoose from 'mongoose';
 import Grievance from '../models/Grievance.js';
 import Department from '../models/Department.js';
 import { generateTrackingId } from '../utils/trackingId.js';
-import { routeGrievance } from '../services/routingService.js';
+import { routeGrievance, routeGrievanceWithAI } from '../services/routingService.js';
+import { analyzeGrievance } from '../services/ai/aiService.js';
 import { apiResponse } from '../utils/apiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -23,15 +24,7 @@ export const createGrievance = asyncHandler(async (req, res) => {
   // 1. Generate unique Tracking ID (GRV-YYYY-NNNNNN)
   const trackingId = await generateTrackingId();
 
-  // 2. Compute SLA due date
-  const validPriority = [PRIORITIES.LOW, PRIORITIES.MEDIUM, PRIORITIES.HIGH, PRIORITIES.CRITICAL].includes(priority)
-    ? priority
-    : PRIORITIES.MEDIUM;
-
-  const hoursToResolve = SLA_HOURS[validPriority] || 96;
-  const dueAt = new Date(Date.now() + hoursToResolve * 60 * 60 * 1000);
-
-  // 3. Process uploaded evidence attachments (if any)
+  // 2. Process uploaded evidence attachments (if any)
   const attachments = (req.files || []).map((file) => ({
     url: `/uploads/${file.filename}`,
     filename: file.originalname,
@@ -40,7 +33,7 @@ export const createGrievance = asyncHandler(async (req, res) => {
     uploadedBy: req.user._id,
   }));
 
-  // 4. Initial timeline entry
+  // 3. Initial timeline entry
   const timeline = [
     {
       status: 'Submitted',
@@ -53,8 +46,42 @@ export const createGrievance = asyncHandler(async (req, res) => {
     },
   ];
 
-  // 5. Rule-based department & officer routing
-  const routing = await routeGrievance(category, req.body.department);
+  // 4. ALWAYS run deterministic AI analysis on submit
+  const locationPayload = {
+    address: address ? address.trim() : (req.user.address || ''),
+    ward: ward ? ward.trim() : (req.user.ward || 'Ward 1 - Central'),
+    landmark: landmark ? landmark.trim() : '',
+    coordinates: {
+      lat: parseFloat(lat) || 19.0760,
+      lng: parseFloat(lng) || 72.8777,
+    },
+  };
+
+  const aiResult = await analyzeGrievance({
+    title: title.trim(),
+    description: description.trim(),
+    location: locationPayload,
+  });
+
+  // 5. Append AI Classified timeline entry
+  const confPercent = Math.round(aiResult.confidence * 100);
+  timeline.push({
+    status: 'AI Classified',
+    title: `AI analysis completed: ${aiResult.department} / ${aiResult.category} / ${aiResult.priority} (${confPercent}%)`,
+    note: aiResult.reasoning || `Classified into ${aiResult.category} with ${confPercent}% confidence.`,
+    actor: null,
+    actorRole: 'system',
+    isInternal: false,
+    createdAt: new Date(Date.now() + 100),
+  });
+
+  // 6. Intelligent routing with governance rules
+  const routing = await routeGrievanceWithAI({
+    citizenCategory: category,
+    citizenDeptCode: req.body.department,
+    citizenPriority: priority,
+    aiAnalysis: aiResult,
+  });
 
   let assignedDeptId = null;
   let assignedOfficerId = null;
@@ -65,14 +92,13 @@ export const createGrievance = asyncHandler(async (req, res) => {
     timeline.push({
       status: 'Submitted',
       title: `Routed to ${routing.department.name}`,
-      note: `Complaint classified into category "${category}" and assigned to municipal department.`,
+      note: `Complaint classified into category "${routing.category}" (${routing.routingReason}).`,
       actor: null,
       actorRole: 'system',
       isInternal: false,
-      createdAt: new Date(Date.now() + 100),
+      createdAt: new Date(Date.now() + 200),
     });
   } else {
-    // Fallback to OTHER department
     const fallbackDept = await Department.findOne({ code: 'OTHER' });
     if (fallbackDept) assignedDeptId = fallbackDept._id;
   }
@@ -87,35 +113,43 @@ export const createGrievance = asyncHandler(async (req, res) => {
       actor: routing.assignedOfficer._id,
       actorRole: 'system',
       isInternal: false,
-      createdAt: new Date(Date.now() + 200),
+      createdAt: new Date(Date.now() + 300),
     });
   }
 
-  // 6. Build and save grievance document
+  // 7. Build and save grievance document
   const grievance = await Grievance.create({
     trackingId,
     title: title.trim(),
     description: description.trim(),
     citizen: req.user._id,
-    category: category.trim(),
+    category: routing.category.trim(),
     department: assignedDeptId,
-    categorySource: 'citizen',
-    priority: validPriority,
+    categorySource: routing.categorySource,
+    priority: routing.priority,
     status,
-    location: {
-      address: address ? address.trim() : (req.user.address || ''),
-      ward: ward ? ward.trim() : (req.user.ward || 'Ward 1 - Central'),
-      landmark: landmark ? landmark.trim() : '',
-      coordinates: {
-        lat: parseFloat(lat) || 19.0760,
-        lng: parseFloat(lng) || 72.8777,
-      },
-    },
+    location: locationPayload,
     attachments,
     assignedOfficer: assignedOfficerId,
+    aiAnalysis: {
+      department: aiResult.department,
+      category: aiResult.category,
+      priority: aiResult.priority,
+      confidence: aiResult.confidence,
+      keywords: aiResult.keywords || [],
+      urgencySignals: aiResult.urgencySignals || [],
+      summary: aiResult.summary || '',
+      reasoning: aiResult.reasoning || '',
+      alternatives: aiResult.alternatives || [],
+      provider: aiResult.provider || 'rule-based-nlp-v1',
+      isMock: aiResult.isMock !== undefined ? aiResult.isMock : true,
+      needsManualReview: aiResult.needsManualReview || false,
+      analyzedAt: new Date(),
+      overridden: false,
+    },
     timeline,
     sla: {
-      dueAt,
+      dueAt: routing.dueAt,
       breached: false,
       escalationLevel: 0,
     },

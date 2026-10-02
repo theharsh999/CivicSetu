@@ -29,6 +29,8 @@ import {
   HardHat,
   Phone,
   Mail,
+  Sparkles,
+  Cpu,
 } from 'lucide-react';
 
 export const GrievanceDetail = () => {
@@ -405,6 +407,52 @@ export const GrievanceDetail = () => {
               </p>
             )}
           </Card>
+
+          {/* AI Automated Routing Lifecycle Card */}
+          {grievance.aiAnalysis && (
+            <Card className="p-4 border-indigo-200/80 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/20 dark:from-slate-900 dark:to-indigo-950/20">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-indigo-100 dark:border-indigo-900/40">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900 dark:text-indigo-200">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>How We Routed Your Complaint</span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {Math.round((grievance.aiAnalysis.confidence || 0) * 100)}% Match
+                </span>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 text-[11px]">Department:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {grievance.department?.name || grievance.aiAnalysis.department}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 text-[11px]">Category:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {grievance.category}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 text-[11px]">Assigned SLA:</span>
+                  <PriorityBadge priority={grievance.priority} size="sm" />
+                </div>
+
+                {grievance.aiAnalysis.reasoning && (
+                  <div className="mt-2 pt-2 border-t border-indigo-100/70 dark:border-indigo-900/30 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed bg-white/60 dark:bg-slate-800/60 p-2 rounded-lg">
+                    <span className="font-semibold text-indigo-700 dark:text-indigo-400">Analysis: </span>
+                    {grievance.aiAnalysis.reasoning}
+                  </div>
+                )}
+
+                <div className="pt-1 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Routing source: {grievance.categorySource === 'ai' ? 'AI Triage' : grievance.categorySource === 'officer' ? 'Officer Reassigned' : 'Citizen Choice'}</span>
+                  <span className="font-mono">Rule-based NLP</span>
+                </div>
+              </div>
+            </Card>
+          )}
 
           {/* Audit Lifecycle Timeline */}
           <Card className="p-5">
