@@ -18,6 +18,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 import Landing from './pages/Landing';
 import NotFound from './pages/NotFound';
 import Track from './pages/Track';
+import HowItWorks from './pages/HowItWorks';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -67,6 +68,8 @@ export function App() {
                 <Route path="/" element={<PublicLayout />}>
                   <Route index element={<Landing />} />
                   <Route path="track" element={<Track />} />
+                  <Route path="how-it-works" element={<HowItWorks />} />
+                  <Route path="about-ai" element={<HowItWorks />} />
                   <Route path="login" element={<Login />} />
                   <Route path="register" element={<Register />} />
                   <Route path="*" element={<NotFound />} />

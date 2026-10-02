@@ -28,7 +28,7 @@ export const PublicLayout = () => {
 
   const navLinks = [
     { label: 'Home', path: '/' },
-    { label: 'How It Works', path: '/#how-it-works' },
+    { label: 'How It Works', path: '/how-it-works' },
     { label: 'Departments', path: '/#departments' },
     { label: 'Track Status', path: '/track' },
   ];

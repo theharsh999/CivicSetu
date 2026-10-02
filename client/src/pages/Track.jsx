@@ -49,7 +49,8 @@ export const Track = () => {
     setError('');
     try {
       const response = await grievanceService.trackGrievance(idToTrack);
-      setGrievance(response.data.grievance);
+      const data = response?.data?.grievance || response?.data || response?.grievance || response;
+      setGrievance(data);
     } catch (err) {
       setGrievance(null);
       setError(

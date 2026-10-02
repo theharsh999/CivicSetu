@@ -213,6 +213,31 @@ const seedDatabase = async () => {
         ward: 'Ward 8 - Industrial',
         phone: '+91 98202 99002',
       },
+      // Third Officers for high-load departments
+      {
+        name: 'Kavita Joshi',
+        code: 'ROADS',
+        email: 'roads.officer3@civicsetu.gov.in',
+        designation: 'Senior Asphalt Maintenance Inspector',
+        ward: 'Ward 3 - East',
+        phone: '+91 98202 11003',
+      },
+      {
+        name: 'Gaurav Kulkarni',
+        code: 'WATER',
+        email: 'water.officer3@civicsetu.gov.in',
+        designation: 'Hydro Distribution & Pressure Specialist',
+        ward: 'Ward 4 - South',
+        phone: '+91 98202 22003',
+      },
+      {
+        name: 'Sunita Deshmukh',
+        code: 'WASTE',
+        email: 'waste.officer3@civicsetu.gov.in',
+        designation: 'Zonal Compost & Waste Marshall',
+        ward: 'Ward 2 - North',
+        phone: '+91 98202 44003',
+      },
     ];
 
     const officerDocs = [];
@@ -232,10 +257,10 @@ const seedDatabase = async () => {
       });
       officerDocs.push(user);
     }
-    console.log(`✅ Seeded ${officerDocs.length} municipal officers.`);
+    console.log(`✅ Seeded ${officerDocs.length} municipal officers (2-3 per department).`);
 
-    // 5. Seed 8 Realistic Demo Citizens
-    console.log('👥 Seeding 8 Demo Citizens...');
+    // 5. Seed 12 Realistic Demo Citizens
+    console.log('👥 Seeding 12 Demo Citizens...');
     const citizenData = [
       { name: 'Aarav Sharma', email: 'citizen1@example.com', ward: 'Ward 1 - Central', address: '42 MG Road, Heritage Quarter', phone: '+91 98111 00001' },
       { name: 'Diya Mukherjee', email: 'citizen2@example.com', ward: 'Ward 2 - North', address: '18 Lakeview Enclave, Sector 4', phone: '+91 98111 00002' },
@@ -245,6 +270,10 @@ const seedDatabase = async () => {
       { name: 'Tanvi Agarwal', email: 'citizen6@example.com', ward: 'Ward 6 - Metro', address: '12 Transit Tower, Commercial Hub', phone: '+91 98111 00006' },
       { name: 'Vivek Chawla', email: 'citizen7@example.com', ward: 'Ward 7 - Suburbs', address: '88 Orchid Lane, North Expy', phone: '+91 98111 00007' },
       { name: 'Sneha Nambiar', email: 'citizen8@example.com', ward: 'Ward 8 - Industrial', address: '201 Factory Road, MIDC Phase 2', phone: '+91 98111 00008' },
+      { name: 'Priya Deshmukh', email: 'citizen9@example.com', ward: 'Ward 9 - Heritage', address: '14 Fort Lane, Clock Tower Square', phone: '+91 98111 00009' },
+      { name: 'Kunal Verma', email: 'citizen10@example.com', ward: 'Ward 1 - Central', address: '302 Regal Avenue, Marine Boulevard', phone: '+91 98111 00010' },
+      { name: 'Meera Joshi', email: 'citizen11@example.com', ward: 'Ward 2 - North', address: '76 Gulmohar Heights, Sector 8', phone: '+91 98111 00011' },
+      { name: 'Sanjay Kulkarni', email: 'citizen12@example.com', ward: 'Ward 3 - East', address: '19 Riverfront Colony, Bypass Road', phone: '+91 98111 00012' },
     ];
 
     const citizenDocs = [];

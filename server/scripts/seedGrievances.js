@@ -517,12 +517,212 @@ const GRIEVANCE_TEMPLATES = [
     overdue: false,
     daysAgo: 55,
   },
+
+  // 46: CANONICAL EXAMPLE 1
+  {
+    deptCode: 'WATER',
+    category: 'Water Supply Disruption',
+    priority: 'High',
+    title: 'No water supply for three days',
+    description: 'No water supply for three days in our entire residential lane near Station Road Sector 3. Daily chores are paralyzed and families are having to buy commercial private water cans.',
+    status: 'In Progress',
+    overdue: false,
+    daysAgo: 3,
+  },
+
+  // 47: CANONICAL EXAMPLE 2
+  {
+    deptCode: 'SWM',
+    category: 'Garbage Collection Failure',
+    priority: 'Medium',
+    title: 'Garbage not collected for a week',
+    description: 'Garbage not collected for a week outside residential block 4 near Hillview Colony. Stray dogs and rodents have scattered the refuse, creating intolerable foul stench and severe health hazards.',
+    status: 'Assigned',
+    overdue: false,
+    daysAgo: 7,
+  },
+
+  // 48: DUPLICATE EXAMPLE 1 (Near MG Road Pothole, ~60m)
+  {
+    deptCode: 'ROADS',
+    category: 'Pothole',
+    priority: 'High',
+    title: 'Second report: Dangerous road crater at MG Road Metro Pillar 42',
+    description: 'Deep road cavity near Metro Pillar 42 is widening. Several scooters almost flipped over this morning during peak commute. Immediate barricading or patching needed.',
+    status: 'In Progress',
+    overdue: false,
+    daysAgo: 12,
+  },
+
+  // 49: DUPLICATE EXAMPLE 2 (Near Old Bazaar Market, ~40m)
+  {
+    deptCode: 'SWM',
+    category: 'Illegal Dumping',
+    priority: 'High',
+    title: 'Urgent: Vegetable waste piling up behind Old Bazaar Main Lane',
+    description: 'Debris and rotten cabbage leaves discarded by vegetable vendors are spilling into pedestrian traffic at Old Bazaar. Needs immediate compactor truck cleanup.',
+    status: 'Assigned',
+    overdue: false,
+    daysAgo: 4,
+  },
+
+  // 50-65: Historical spread (15 to 88 days ago) for realistic monthly analytics
+  {
+    deptCode: 'HEALTH',
+    category: 'Mosquito/Dengue Breeding',
+    priority: 'High',
+    title: 'Stagnant water pools creating intense mosquito breeding near slum colony',
+    description: 'Open trench water stagnation has resulted in a massive surge in dengue and malaria cases among local children. Urgent thermal fogging required.',
+    status: 'Resolved',
+    overdue: false,
+    daysAgo: 40,
+  },
+  {
+    deptCode: 'ELECTRICITY',
+    category: 'Streetlight Outage',
+    priority: 'Medium',
+    title: 'Complete dark stretch on Highway Link Road between Sector 7 and 9',
+    description: 'Eight consecutive high-mast sodium lamps are defunct along the four-lane arterial connector, creating grave risks for night driving and women commuters.',
+    status: 'Closed',
+    overdue: false,
+    daysAgo: 62,
+  },
+  {
+    deptCode: 'DRAINAGE',
+    category: 'Sewage Overflow',
+    priority: 'Critical',
+    title: 'Burst sewer line flooding ground floor parking of Hillview Colony',
+    description: 'Black sewage effluent backed up into the residential car parking basement. Extremely unbearable biohazard stench and contamination risk.',
+    status: 'Closed',
+    overdue: false,
+    daysAgo: 70,
+  },
+  {
+    deptCode: 'ROADS',
+    category: 'Damaged Road/Footpath',
+    priority: 'Medium',
+    title: 'Worn out bituminous layer creating loose gravel skid hazard',
+    description: 'Top tar layer stripped away leaving sharp loose stones. Two-wheeler braking is compromised on the downhill turn.',
+    status: 'Resolved',
+    overdue: false,
+    daysAgo: 48,
+  },
+  {
+    deptCode: 'WATER',
+    category: 'Pipeline Leakage',
+    priority: 'High',
+    title: 'Underground feeder water pipe ruptured near municipal school',
+    description: 'Pressurized drinking water geyser rising 3 feet above asphalt since early morning. Gallons of potable water getting lost into storm drains.',
+    status: 'Closed',
+    overdue: false,
+    daysAgo: 75,
+  },
+  {
+    deptCode: 'PARKS',
+    category: 'Fallen Tree/Branches',
+    priority: 'High',
+    title: 'Storm uprooted ancient banyan branch resting on 11kV electrical feeder',
+    description: 'Massive tree limb broke during thunderstorm and is currently entangled in live overhead power lines outside Sector 12 community park.',
+    status: 'Closed',
+    overdue: false,
+    daysAgo: 82,
+  },
+  {
+    deptCode: 'TRAFFIC',
+    category: 'Traffic Light Malfunction',
+    priority: 'Critical',
+    title: 'All-red signal fault at busy 4-way Regal Circle interchange',
+    description: 'Signal controller stuck on all-red causing complete vehicular gridlock across four arterial converging lanes during morning office rush.',
+    status: 'Resolved',
+    overdue: false,
+    daysAgo: 50,
+  },
+  {
+    deptCode: 'BUILDING',
+    category: 'Unauthorized Construction',
+    priority: 'Medium',
+    title: 'Illegal fifth floor masonry addition without municipal clearance',
+    description: 'Property owner erecting unauthorized brick structure on terrace of a 4-story building without structural stability certificate.',
+    status: 'In Progress',
+    overdue: false,
+    daysAgo: 25,
+  },
+  {
+    deptCode: 'SWM',
+    category: 'Overflowing Dustbin',
+    priority: 'Low',
+    title: 'Rusted municipal dustbin broken and spilled onto pavement',
+    description: 'Metal municipal waste receptacle has broken base, causing litter to fall onto pedestrian walkway outside primary school.',
+    status: 'Resolved',
+    overdue: false,
+    daysAgo: 38,
+  },
+  {
+    deptCode: 'HEALTH',
+    category: 'Food Safety Issue',
+    priority: 'High',
+    title: 'Unhygienic open street vendor cooking next to uncovered drain',
+    description: 'Food stall operating without food safety license right above stagnant drainage gutter with flies swarming open cooking oil.',
+    status: 'Closed',
+    overdue: false,
+    daysAgo: 85,
+  },
+  {
+    deptCode: 'DRAINAGE',
+    category: 'Blocked Storm Drain',
+    priority: 'Medium',
+    title: 'Stormwater culvert clogged with construction mortar and gravel',
+    description: 'Private developers dumped excess plaster into municipal drain opening, completely choking rainwater exit ahead of monsoon season.',
+    status: 'Closed',
+    overdue: false,
+    daysAgo: 66,
+  },
+  {
+    deptCode: 'ELECTRICITY',
+    category: 'Hanging Electric Cable',
+    priority: 'Critical',
+    title: 'Snapped overhead power cable sparking on wet pedestrian walkway',
+    description: 'Live electrical cable severed and touching metallic railing near bus stop. Immediate shutdown and isolation needed.',
+    status: 'Closed',
+    overdue: false,
+    daysAgo: 88,
+  },
+  {
+    deptCode: 'ROADS',
+    category: 'Broken Signage/Divider',
+    priority: 'Low',
+    title: 'Faded pedestrian zebra crossing paint outside girls secondary school',
+    description: 'Vehicles fail to slow down because the road crossing stripes have completely worn away. Needs reflective thermal paint application.',
+    status: 'Resolved',
+    overdue: false,
+    daysAgo: 42,
+  },
+  {
+    deptCode: 'WATER',
+    category: 'Low Water Pressure',
+    priority: 'Low',
+    title: 'Trickling water pressure on third floor apartments in Sunrise residency',
+    description: 'Booster valve in distribution line seems throttled. Families unable to fill overhead tanks during municipal supply window.',
+    status: 'In Progress',
+    overdue: false,
+    daysAgo: 16,
+  },
+  {
+    deptCode: 'OTHER',
+    category: 'Public Nuisance',
+    priority: 'Medium',
+    title: 'Abandoned rust-eaten commercial delivery van blocking fire hydrant',
+    description: 'Commercial vehicle with flat tires left parked for two months right in front of the municipal emergency water hydrant.',
+    status: 'Assigned',
+    overdue: false,
+    daysAgo: 11,
+  },
 ];
 
 const seedGrievances = async () => {
   try {
     console.log(`\n======================================================`);
-    console.log(`🌱 CivicSetu: Seeding 45 Realistic Grievance Lifecycle Records`);
+    console.log(`🌱 CivicSetu: Seeding 65 Realistic Grievance Lifecycle Records`);
     console.log(`📡 Connecting to MongoDB at: ${MONGO_URI}`);
     console.log(`======================================================\n`);
 
@@ -543,6 +743,11 @@ const seedGrievances = async () => {
     departments.forEach((d) => {
       deptMap[d.code] = d;
     });
+    // Add common department code aliases
+    if (deptMap['WASTE']) deptMap['SWM'] = deptMap['WASTE'];
+    if (deptMap['DRAIN']) deptMap['DRAINAGE'] = deptMap['DRAIN'];
+    if (deptMap['ELEC']) deptMap['ELECTRICITY'] = deptMap['ELEC'];
+    if (deptMap['BUILD']) deptMap['BUILDING'] = deptMap['BUILD'];
 
     const officersByDept = {};
     officers.forEach((off) => {
@@ -552,6 +757,10 @@ const seedGrievances = async () => {
         officersByDept[deptCode].push(off);
       }
     });
+    if (officersByDept['WASTE']) officersByDept['SWM'] = officersByDept['WASTE'];
+    if (officersByDept['DRAIN']) officersByDept['DRAINAGE'] = officersByDept['DRAIN'];
+    if (officersByDept['ELEC']) officersByDept['ELECTRICITY'] = officersByDept['ELEC'];
+    if (officersByDept['BUILD']) officersByDept['BUILDING'] = officersByDept['BUILD'];
 
     // 2. Clear existing records (idempotent)
     console.log('🧹 Clearing existing Grievance and Notification records...');

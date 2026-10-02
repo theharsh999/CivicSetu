@@ -293,10 +293,17 @@ export const getGrievanceById = asyncHandler(async (req, res) => {
   // Authorization check
   const isOwner = req.user.role === ROLES.CITIZEN && grievance.citizen?._id?.toString() === req.user._id.toString();
   const isAdmin = req.user.role === ROLES.ADMIN;
-  const isOfficer = req.user.role === ROLES.OFFICER;
 
-  if (!isOwner && !isAdmin && !isOfficer) {
-    throw new ApiError(403, 'You are not authorized to view this grievance.');
+  const officerDeptId = req.user.department?._id?.toString() || req.user.department?.toString();
+  const grievanceDeptId = grievance.department?._id?.toString() || grievance.department?.toString();
+  const isOfficerInDept = req.user.role === ROLES.OFFICER && (
+    !officerDeptId ||
+    officerDeptId === grievanceDeptId ||
+    grievance.assignedOfficer?._id?.toString() === req.user._id.toString()
+  );
+
+  if (!isOwner && !isAdmin && !isOfficerInDept) {
+    throw new ApiError(403, 'You are not authorized to access this grievance ticket.');
   }
 
   // Hide internal entries for citizen
@@ -365,7 +372,9 @@ export const trackPublicGrievance = asyncHandler(async (req, res) => {
       })),
   };
 
-  return apiResponse(res, 200, 'Public grievance status retrieved', safeData);
+  return apiResponse(res, 200, 'Public grievance status retrieved', {
+    grievance: safeData,
+  });
 });
 
 /**
