@@ -12,7 +12,11 @@ import authRoutes from './routes/authRoutes.js';
 const app = express();
 
 // Security HTTP headers
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
 // Cross-Origin Resource Sharing
 const allowedOrigins = [
@@ -45,6 +49,13 @@ if (process.env.NODE_ENV !== 'test') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+import path from 'path';
+import { fileURLToPath } from 'url';
+import grievanceRoutes from './routes/grievanceRoutes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Health Check Route (Publicly accessible without authentication)
 app.get('/api/health', (req, res) => {
   return apiResponse(res, 200, 'CivicSetu Municipal Grievance API is operational', {
@@ -56,8 +67,12 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Static uploads directory for grievance attachments
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Mount API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/grievances', grievanceRoutes);
 
 // 404 Handler for undefined routes
 app.use(notFound);

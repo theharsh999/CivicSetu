@@ -29,3 +29,7 @@ Thumbs.db
 .idea/
 *.sublime-project
 *.sublime-workspace
+
+# Uploads
+server/uploads/*
+!server/uploads/.gitkeep

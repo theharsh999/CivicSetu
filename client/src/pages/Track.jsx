@@ -1,30 +1,94 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { Search, FileSearch, ArrowRight, ShieldCheck, Clock, CheckCircle2, AlertTriangle, Building2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
+import {
+  Search,
+  FileSearch,
+  ArrowRight,
+  ShieldCheck,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  Building2,
+  Calendar,
+  Layers,
+  MapPin,
+} from 'lucide-react';
+import grievanceService from '../services/grievanceService';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
+import ErrorState from '../components/ui/ErrorState';
+import Skeleton from '../components/ui/Skeleton';
 import StatusBadge from '../components/ui/StatusBadge';
 import PriorityBadge from '../components/ui/PriorityBadge';
+import StatusTimeline from '../components/grievance/StatusTimeline';
 
 export const Track = () => {
-  const [searchParams] = useSearchParams();
-  const [ticketId, setTicketId] = useState(searchParams.get('id') || '');
-  const [queriedId, setQueriedId] = useState(searchParams.get('id') || '');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { trackingId: routeTrackingId } = useParams();
+  const navigate = useNavigate();
+
+  const initialId = (routeTrackingId || searchParams.get('id') || '').trim().toUpperCase();
+  const [ticketInput, setTicketInput] = useState(initialId);
+  const [activeTrackingId, setActiveTrackingId] = useState(initialId);
+
+  const [grievance, setGrievance] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const fetchTrackData = useCallback(async (idToTrack) => {
+    if (!idToTrack) {
+      setGrievance(null);
+      setError('');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const response = await grievanceService.trackGrievance(idToTrack);
+      setGrievance(response.data.grievance);
+    } catch (err) {
+      setGrievance(null);
+      setError(
+        err.response?.data?.message ||
+          `No municipal record found for ticket "${idToTrack}". Please verify the reference ID and try again.`
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const id = searchParams.get('id');
+    const id = (routeTrackingId || searchParams.get('id') || '').trim().toUpperCase();
     if (id) {
-      setTicketId(id);
-      setQueriedId(id);
+      setTicketInput(id);
+      setActiveTrackingId(id);
+      fetchTrackData(id);
     }
-  }, [searchParams]);
+  }, [routeTrackingId, searchParams, fetchTrackData]);
 
   const handleSearch = (e) => {
     e.preventDefault();
-    setQueriedId(ticketId.trim().toUpperCase());
+    const cleanId = ticketInput.trim().toUpperCase();
+    if (!cleanId) return;
+
+    setActiveTrackingId(cleanId);
+    setSearchParams({ id: cleanId });
+    fetchTrackData(cleanId);
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   return (
@@ -34,7 +98,7 @@ export const Track = () => {
           Track Grievance Redressal
         </h1>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          Enter your unique municipal complaint reference ID to view real-time department routing, SLA clocks, and officer progress.
+          Enter your unique municipal complaint reference ID (e.g., GRV-2026-000001) to view real-time department routing, SLA clocks, and progress audits.
         </p>
       </div>
 
@@ -42,9 +106,9 @@ export const Track = () => {
         <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <Input
-              placeholder="e.g. CIV-2026-8941"
-              value={ticketId}
-              onChange={(e) => setTicketId(e.target.value)}
+              placeholder="e.g. GRV-2026-000001"
+              value={ticketInput}
+              onChange={(e) => setTicketInput(e.target.value)}
               leftIcon={<Search className="w-4 h-4" />}
             />
           </div>
@@ -54,32 +118,65 @@ export const Track = () => {
         </form>
 
         <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-          <span>Example tickets: <button type="button" onClick={() => { setTicketId('CIV-2026-8941'); setQueriedId('CIV-2026-8941'); }} className="underline hover:text-brand-500">CIV-2026-8941</button>, <button type="button" onClick={() => { setTicketId('CIV-2026-4102'); setQueriedId('CIV-2026-4102'); }} className="underline hover:text-brand-500">CIV-2026-4102</button></span>
+          <span>
+            Public access &bull; Format:{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setTicketInput('GRV-2026-000001');
+                setActiveTrackingId('GRV-2026-000001');
+                setSearchParams({ id: 'GRV-2026-000001' });
+                fetchTrackData('GRV-2026-000001');
+              }}
+              className="font-mono text-brand-600 dark:text-brand-400 hover:underline"
+            >
+              GRV-2026-000001
+            </button>
+          </span>
           <span className="hidden sm:inline">Updated in real-time</span>
         </div>
       </Card>
 
-      {queriedId ? (
+      {loading ? (
+        <div className="space-y-4">
+          <Skeleton className="h-44 w-full" />
+          <Skeleton className="h-56 w-full" />
+        </div>
+      ) : error ? (
+        <div className="py-6">
+          <ErrorState
+            title="Ticket Not Found"
+            message={error}
+            retryLabel="Clear and Try Again"
+            onRetry={() => {
+              setTicketInput('');
+              setActiveTrackingId('');
+              setSearchParams({});
+              setError('');
+            }}
+          />
+        </div>
+      ) : grievance ? (
         <div className="space-y-6 animate-fade-in">
-          {/* Mock grievance record display */}
+          {/* Grievance Public Summary Card */}
           <Card className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-3">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/60 px-2 py-0.5 rounded">
-                    {queriedId}
+                    {grievance.trackingId}
                   </span>
-                  <StatusBadge status="In Progress" />
-                  <PriorityBadge priority="High" />
+                  <StatusBadge status={grievance.status} />
+                  <PriorityBadge priority={grievance.priority} />
                 </div>
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white mt-2">
-                  Large hazardous pothole near City Center Metro Pillar 42
+                  {grievance.title}
                 </h2>
               </div>
-              <div className="text-right sm:text-right">
-                <span className="text-xs text-slate-400">Logged on</span>
+              <div className="text-right sm:text-right shrink-0">
+                <span className="text-xs text-slate-400">Lodged On</span>
                 <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Oct 01, 2026 &bull; 09:30 AM
+                  {formatDate(grievance.createdAt)}
                 </p>
               </div>
             </div>
@@ -88,19 +185,19 @@ export const Track = () => {
               <div>
                 <span className="text-slate-400">Department</span>
                 <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
-                  Roads & Infrastructure (PWD)
+                  {grievance.department?.name || 'Municipal Department'}
                 </p>
               </div>
               <div>
-                <span className="text-slate-400">SLA Resolution Target</span>
-                <p className="font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
-                  48 Hours (Remaining: 21h 14m)
-                </p>
-              </div>
-              <div>
-                <span className="text-slate-400">Assigned Field Officer</span>
+                <span className="text-slate-400">Category</span>
                 <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
-                  Er. Rajesh Verma (Ward 4)
+                  {grievance.category}
+                </p>
+              </div>
+              <div>
+                <span className="text-slate-400">Jurisdiction Ward</span>
+                <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                  {grievance.location?.ward || 'Central Zone'}
                 </p>
               </div>
             </div>
@@ -110,52 +207,7 @@ export const Track = () => {
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">
                 Redressal Audit Trail
               </h3>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0 mt-0.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="text-xs">
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">
-                      Grievance Lodged by Citizen
-                    </p>
-                    <p className="text-slate-500 dark:text-slate-400">
-                      Citizen reported complaint with attached geotagged photos.
-                    </p>
-                    <span className="text-[10px] text-slate-400">Oct 01, 2026 - 09:30 AM</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0 mt-0.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="text-xs">
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">
-                      AI Classification & Department Routing
-                    </p>
-                    <p className="text-slate-500 dark:text-slate-400">
-                      Auto-detected department "ROADS" and priority "High" based on pothole hazard keywords.
-                    </p>
-                    <span className="text-[10px] text-slate-400">Oct 01, 2026 - 09:31 AM</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-brand-500 text-white flex items-center justify-center text-xs shrink-0 mt-0.5">
-                    <Clock className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="text-xs">
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">
-                      Assigned to Ward Engineer
-                    </p>
-                    <p className="text-slate-500 dark:text-slate-400">
-                      Field team inspection scheduled for asphalt patch repair.
-                    </p>
-                    <span className="text-[10px] text-slate-400">Oct 01, 2026 - 11:15 AM</span>
-                  </div>
-                </div>
-              </div>
+              <StatusTimeline timeline={grievance.timeline || []} />
             </div>
           </Card>
         </div>
@@ -163,7 +215,7 @@ export const Track = () => {
         <EmptyState
           icon={FileSearch}
           title="No Ticket Queried Yet"
-          description="Enter a valid grievance reference ID above to track the complete resolution lifecycle and field officer actions."
+          description="Enter a valid grievance reference ID above to track the complete resolution lifecycle, assigned department, and field progress."
         />
       )}
     </div>
