@@ -1,5 +1,10 @@
 import { ApiError } from '../utils/ApiError.js';
 import { ALLOWED_TRANSITIONS } from '../utils/constants.js';
+import {
+  notifyStatusUpdate,
+  notifyAssignment,
+  notifyEscalation,
+} from './notificationService.js';
 
 /**
  * Validates and executes a lifecycle status transition on a grievance.
@@ -106,6 +111,30 @@ export const applyTransition = async (grievance, toStatus, actor, note = '', ext
   });
 
   await grievance.save();
+
+  // 6. Centralized Notifications Dispatch
+  try {
+    const citizenId = grievance.citizen?._id || grievance.citizen;
+    const officerId = grievance.assignedOfficer?._id || grievance.assignedOfficer;
+
+    // Notify citizen on key lifecycle steps
+    if (citizenId && ['In Progress', 'Awaiting Verification', 'Resolved', 'Closed'].includes(toStatus)) {
+      notifyStatusUpdate(citizenId, grievance, toStatus, note);
+    }
+
+    // Notify officer when assigned
+    if (toStatus === 'Assigned' && officerId) {
+      notifyAssignment(officerId, grievance, grievance.department?.name || '');
+    }
+
+    // Notify officer & admins on SLA escalation
+    if (toStatus === 'Escalated') {
+      notifyEscalation(grievance, grievance.sla?.escalationLevel || 1);
+    }
+  } catch (notifErr) {
+    console.error('Non-blocking notification error in applyTransition:', notifErr.message);
+  }
+
   return grievance;
 };
 

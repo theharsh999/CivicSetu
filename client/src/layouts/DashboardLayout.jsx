@@ -27,8 +27,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useNotifications } from '../context/NotificationContext';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
+import NotificationBell from '../components/notifications/NotificationBell';
 
 export const ROLE_NAV_CONFIG = {
   citizen: {
@@ -63,6 +65,7 @@ export const ROLE_NAV_CONFIG = {
       { label: 'Map View', path: '/dashboard/admin/map', icon: MapPin },
       { label: 'Departments', path: '/dashboard/admin/departments', icon: FolderTree },
       { label: 'Users', path: '/dashboard/admin/users', icon: Users },
+      { label: 'Notifications', path: '/dashboard/admin/notifications', icon: Bell },
     ]
   }
 };
@@ -70,6 +73,7 @@ export const ROLE_NAV_CONFIG = {
 export const DashboardLayout = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const toast = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -224,11 +228,18 @@ export const DashboardLayout = () => {
                 {!sidebarCollapsed && (
                   <span className="flex-1 truncate">{item.label}</span>
                 )}
-                {!sidebarCollapsed && item.badge && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300">
-                    {item.badge}
-                  </span>
-                )}
+                {!sidebarCollapsed &&
+                  (item.label === 'Notifications' ? (
+                    unreadCount > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white animate-pulse">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    ) : null
+                  ) : item.badge ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300">
+                      {item.badge}
+                    </span>
+                  ) : null)}
               </Link>
             );
           })}
@@ -293,17 +304,8 @@ export const DashboardLayout = () => {
               {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
             </button>
 
-            {/* Notification Bell PLACEHOLDER */}
-            <div className="relative">
-              <button
-                type="button"
-                className="p-2 rounded-xl text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative"
-                title="Notifications (Placeholder - wired in Prompt 2)"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
-              </button>
-            </div>
+            {/* Live Notification Bell */}
+            <NotificationBell />
 
             {/* User Menu PLACEHOLDER */}
             <div className="relative">

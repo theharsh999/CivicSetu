@@ -34,6 +34,18 @@ export const grievanceService = {
     const response = await api.get('/grievances/my/stats');
     return response.data;
   },
+
+  // Submit citizen satisfaction rating (1-5) and close grievance
+  submitFeedback: async (id, { rating, comment }) => {
+    const response = await api.post(`/grievances/${id}/feedback`, { rating, comment });
+    return response.data;
+  },
+
+  // Reopen resolved grievance within 7-day window
+  reopenGrievance: async (id, reason) => {
+    const response = await api.post(`/grievances/${id}/reopen`, { reason });
+    return response.data;
+  },
 };
 
 export default grievanceService;

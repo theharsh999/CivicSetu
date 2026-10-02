@@ -378,7 +378,7 @@ export const GrievanceWorkbench = () => {
               </button>
               <StatusBadge status={grievance.status} size="md" />
               <PriorityBadge priority={grievance.priority} size="md" />
-              <SlaBadge dueAt={grievance.sla?.dueAt} status={grievance.status} />
+              <SlaBadge grievance={grievance} showProgress={true} />
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1.5">
               {grievance.title}

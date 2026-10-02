@@ -317,7 +317,7 @@ export const OfficerAssigned = () => {
                       <StatusBadge status={g.status} size="sm" />
                     </td>
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <SlaBadge dueAt={g.sla?.dueAt} status={g.status} />
+                      <SlaBadge grievance={g} />
                     </td>
                     {scope === 'department' && (
                       <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 dark:text-slate-300">
@@ -369,7 +369,7 @@ export const OfficerAssigned = () => {
 
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                   <PriorityBadge priority={g.priority} size="sm" />
-                  <SlaBadge dueAt={g.sla?.dueAt} status={g.status} />
+                  <SlaBadge grievance={g} />
                 </div>
               </Card>
             ))}

@@ -6,3 +6,4 @@ export { default as AdminMap } from './admin/AdminMap';
 export { default as AdminDepartments } from './admin/AdminDepartments';
 export { default as AdminUsers } from './admin/AdminUsers';
 export { default as AdminGrievanceDrawer } from './admin/AdminGrievanceDrawer';
+export { default as AdminNotifications } from './NotificationsPage';

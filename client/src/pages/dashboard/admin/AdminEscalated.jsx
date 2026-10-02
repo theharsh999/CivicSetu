@@ -16,6 +16,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import PriorityBadge from '../../../components/ui/PriorityBadge';
+import SlaBadge from '../../../components/ui/SlaBadge';
 import Skeleton from '../../../components/ui/Skeleton';
 import EmptyState from '../../../components/ui/EmptyState';
 import AdminGrievanceDrawer from './AdminGrievanceDrawer';
@@ -181,16 +182,7 @@ export const AdminEscalated = () => {
                       </span>
                       <PriorityBadge priority={item.priority} size="sm" />
                       <StatusBadge status={item.status} size="sm" />
-                      {isBreached && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-200">
-                          SLA EXCEEDED
-                        </span>
-                      )}
-                      {item.sla?.escalationLevel > 0 && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-                          Tier {item.sla.escalationLevel} Escalation
-                        </span>
-                      )}
+                      <SlaBadge grievance={item} showProgress={true} />
                     </div>
 
                     <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
@@ -210,10 +202,6 @@ export const AdminEscalated = () => {
                       <span>•</span>
                       <span>
                         Officer: <strong>{item.assignedOfficer?.name || 'Unassigned'}</strong>
-                      </span>
-                      <span>•</span>
-                      <span className="font-mono text-rose-600 dark:text-rose-400 font-semibold">
-                        SLA Target: {item.sla?.dueAt ? new Date(item.sla.dueAt).toLocaleDateString() : 'N/A'}
                       </span>
                     </div>
                   </div>

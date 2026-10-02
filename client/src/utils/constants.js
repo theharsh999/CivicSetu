@@ -23,14 +23,14 @@ export const STATUSES = [
 ];
 
 export const ALLOWED_TRANSITIONS = {
-  'Submitted': ['AI Classified', 'Assigned'],
-  'AI Classified': ['Assigned'],
+  'Submitted': ['AI Classified', 'Assigned', 'Escalated'],
+  'AI Classified': ['Assigned', 'Escalated'],
   'Assigned': ['In Progress', 'Escalated'],
   'In Progress': ['Awaiting Verification', 'Escalated'],
-  'Awaiting Verification': ['Resolved', 'In Progress'],
+  'Awaiting Verification': ['Resolved', 'In Progress', 'Escalated'],
   'Resolved': ['Closed', 'In Progress'],
   'Closed': [],
-  'Escalated': ['In Progress', 'Assigned']
+  'Escalated': ['In Progress', 'Assigned', 'Awaiting Verification', 'Resolved']
 };
 
 export const STATUS_CONFIG = {

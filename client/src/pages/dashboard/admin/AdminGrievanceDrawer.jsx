@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import PriorityBadge from '../../../components/ui/PriorityBadge';
+import SlaBadge from '../../../components/ui/SlaBadge';
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
 import Select from '../../../components/ui/Select';
@@ -183,6 +184,7 @@ export const AdminGrievanceDrawer = ({
                 </button>
                 <StatusBadge status={grievance.status} size="sm" />
                 <PriorityBadge priority={grievance.priority} size="sm" />
+                <SlaBadge grievance={grievance} />
               </div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white mt-1.5 leading-snug">
                 {grievance.title}

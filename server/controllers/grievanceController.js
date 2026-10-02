@@ -4,6 +4,13 @@ import Department from '../models/Department.js';
 import { generateTrackingId } from '../utils/trackingId.js';
 import { routeGrievance, routeGrievanceWithAI } from '../services/routingService.js';
 import { analyzeGrievance } from '../services/ai/aiService.js';
+import { applyTransition } from '../services/workflowService.js';
+import {
+  notify,
+  notifyAdmins,
+  notifyAiRouted,
+  notifyAssignment,
+} from '../services/notificationService.js';
 import { apiResponse } from '../utils/apiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -159,6 +166,16 @@ export const createGrievance = asyncHandler(async (req, res) => {
     .populate('department', 'name code icon color')
     .populate('assignedOfficer', 'name designation phone ward avatar email')
     .populate('citizen', 'name email phone avatar');
+
+  // Dispatch non-blocking notifications
+  try {
+    await notifyAiRouted(req.user._id, populatedGrievance, populatedGrievance.department?.name);
+    if (assignedOfficerId) {
+      await notifyAssignment(assignedOfficerId, populatedGrievance, populatedGrievance.department?.name);
+    }
+  } catch (notifErr) {
+    console.error('Non-blocking notification error on createGrievance:', notifErr.message);
+  }
 
   return apiResponse(res, 201, 'Grievance lodged successfully', {
     grievance: populatedGrievance,
@@ -385,5 +402,152 @@ export const getMyStats = asyncHandler(async (req, res) => {
     resolved,
     pending,
     escalated,
+  });
+});
+
+/**
+ * @desc    Submit citizen satisfaction rating and close grievance
+ * @route   POST /api/grievances/:id/feedback
+ * @access  Private (Owner Citizen only)
+ */
+export const submitFeedback = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { rating, comment } = req.body;
+
+  const numRating = Number(rating);
+  if (!numRating || numRating < 1 || numRating > 5) {
+    throw new ApiError(400, 'Rating must be an integer between 1 and 5 stars.');
+  }
+
+  const grievance = await Grievance.findById(id);
+  if (!grievance) {
+    throw new ApiError(404, 'Grievance ticket not found');
+  }
+
+  // Verify ownership
+  if (grievance.citizen.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, 'You are not authorized to submit feedback for this grievance.');
+  }
+
+  // Only allowed when status is Resolved
+  if (grievance.status !== 'Resolved') {
+    throw new ApiError(400, `Feedback can only be submitted for Resolved grievances (current status: ${grievance.status}).`);
+  }
+
+  // Store feedback on grievance
+  grievance.feedback = {
+    rating: Math.round(numRating),
+    comment: (comment || '').trim(),
+    submittedAt: new Date(),
+  };
+
+  // Close grievance via applyTransition
+  const transitionNote = (comment || '').trim()
+    ? `Citizen submitted ${numRating}★ satisfaction rating: "${comment.trim()}"`
+    : `Citizen submitted ${numRating}★ rating and confirmed resolution.`;
+
+  const updatedGrievance = await applyTransition(grievance, 'Closed', req.user, transitionNote);
+
+  // Notify assigned officer
+  if (grievance.assignedOfficer) {
+    try {
+      await notify(grievance.assignedOfficer, {
+        type: 'feedback_request',
+        title: `Citizen Feedback: ${grievance.trackingId} (${numRating}★)`,
+        message: `Citizen rated your resolution ${numRating}/5: "${comment ? comment.trim() : 'Satisfied with resolution'}"`,
+        grievanceId: grievance._id,
+        data: { trackingId: grievance.trackingId, rating: numRating },
+      });
+    } catch (notifErr) {
+      console.error('Non-blocking feedback notification error:', notifErr.message);
+    }
+  }
+
+  const populated = await Grievance.findById(updatedGrievance._id)
+    .populate('department', 'name code icon color')
+    .populate('assignedOfficer', 'name designation phone ward avatar email')
+    .populate('citizen', 'name email phone avatar');
+
+  return apiResponse(res, 200, 'Feedback recorded and grievance closed successfully', {
+    grievance: populated,
+  });
+});
+
+/**
+ * @desc    Citizen dispute/reopen of resolved grievance (within 7 days)
+ * @route   POST /api/grievances/:id/reopen
+ * @access  Private (Owner Citizen only)
+ */
+export const reopenGrievance = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  if (!reason || !reason.trim()) {
+    throw new ApiError(400, 'A clear reason is required to dispute resolution and reopen this grievance.');
+  }
+
+  const grievance = await Grievance.findById(id);
+  if (!grievance) {
+    throw new ApiError(404, 'Grievance ticket not found');
+  }
+
+  // Verify ownership
+  if (grievance.citizen.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, 'You are not authorized to reopen this grievance.');
+  }
+
+  // Only allowed when status is Resolved
+  if (grievance.status !== 'Resolved') {
+    throw new ApiError(400, `Only grievances with status "Resolved" can be reopened (current: ${grievance.status}).`);
+  }
+
+  // Check 7-day dispute window
+  const resolvedTime = grievance.resolution?.resolvedAt
+    ? new Date(grievance.resolution.resolvedAt).getTime()
+    : new Date(grievance.updatedAt).getTime();
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+  if (Date.now() - resolvedTime > sevenDaysMs) {
+    throw new ApiError(400, 'The 7-day dispute period has expired. Please file a new grievance ticket if the issue reoccurred.');
+  }
+
+  // Transition back to In Progress
+  const updatedGrievance = await applyTransition(
+    grievance,
+    'In Progress',
+    req.user,
+    `Citizen disputed resolution: ${reason.trim()}`
+  );
+
+  // Notify assigned officer and admins
+  try {
+    if (grievance.assignedOfficer) {
+      await notify(grievance.assignedOfficer, {
+        type: 'status_update',
+        title: `Reopened Ticket: ${grievance.trackingId}`,
+        message: `Citizen disputed the resolution. Reason: "${reason.trim()}". Status reverted to In Progress.`,
+        grievanceId: grievance._id,
+        data: { trackingId: grievance.trackingId, reason: reason.trim() },
+      });
+    }
+
+    await notifyAdmins({
+      type: 'status_update',
+      title: `Disputed Grievance Reopened: ${grievance.trackingId}`,
+      message: `Citizen rejected resolution for ticket ${grievance.trackingId}. Case reopened with remark: "${reason.trim()}".`,
+      grievanceId: grievance._id,
+      data: { trackingId: grievance.trackingId, reason: reason.trim() },
+    });
+  } catch (notifErr) {
+    console.error('Non-blocking reopen notification error:', notifErr.message);
+  }
+
+  const populated = await Grievance.findById(updatedGrievance._id)
+    .populate('department', 'name code icon color')
+    .populate('assignedOfficer', 'name designation phone ward avatar email')
+    .populate('citizen', 'name email phone avatar');
+
+  return apiResponse(res, 200, 'Grievance reopened and returned to field investigation', {
+    grievance: populated,
   });
 });

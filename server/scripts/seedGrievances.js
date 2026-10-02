@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import Department from '../models/Department.js';
 import User from '../models/User.js';
 import Grievance from '../models/Grievance.js';
+import Notification from '../models/Notification.js';
 import { analyzeGrievance } from '../services/ai/aiService.js';
 import { DEPARTMENTS, SLA_HOURS, PRIORITIES } from '../utils/constants.js';
 
@@ -552,15 +553,27 @@ const seedGrievances = async () => {
       }
     });
 
-    // 2. Clear existing grievances (idempotent)
-    console.log('🧹 Clearing existing Grievance records...');
+    // 2. Clear existing records (idempotent)
+    console.log('🧹 Clearing existing Grievance and Notification records...');
     await Grievance.deleteMany({});
-    console.log('✅ Grievance collection cleared.');
+    await Notification.deleteMany({});
+    console.log('✅ Grievance and Notification collections cleared.');
 
     // 3. Generate 45 realistic grievances
     console.log('📝 Generating 45 realistic municipal grievances with coherent audit trails...');
     const currentYear = new Date().getFullYear();
     const grievanceDocs = [];
+
+    const FEEDBACK_LIST = [
+      { rating: 5, comment: 'Pothole was patched very neatly with hot mix asphalt within 24 hours. Commute is safe again!' },
+      { rating: 4, comment: 'Drain desilting completed promptly, though cleaning debris could have been cleared a bit faster.' },
+      { rating: 5, comment: 'Streetlight pole and LED replaced on the same evening. Outstanding responsiveness!' },
+      { rating: 3, comment: 'Garbage heap cleared, but bins were not replaced as requested. Hope the bins follow soon.' },
+      { rating: 5, comment: 'Broken water pipeline repaired without disruption to morning supply. Great job team.' },
+      { rating: 4, comment: 'Fallen tree branches cleared safely from footpath. Thank you ward garden department.' },
+      { rating: 5, comment: 'Public park swing repaired and repainted. Children are using it happily now!' },
+      { rating: 4, comment: 'Illegal hoarding removed from foot-over-bridge promptly after complaint.' },
+    ];
 
     for (let i = 0; i < GRIEVANCE_TEMPLATES.length; i++) {
       const t = GRIEVANCE_TEMPLATES[i];
@@ -573,13 +586,49 @@ const seedGrievances = async () => {
       const locality = LOCALITIES[i % LOCALITIES.length];
       const geo = getGeo(i);
 
-      // SLA Target calculation
-      const hoursAllowed = SLA_HOURS[t.priority] || 96;
-      const createdAt = new Date(Date.now() - t.daysAgo * 24 * 60 * 60 * 1000);
-      
+      // Reopened demo cases (indices 0 and 20)
+      const isReopened = i === 0 || i === 20;
+
+      // SLA variations
+      const isAtRisk = (i === 1 || i === 10) && !isReopened;
+      const isTier2Escalated = i === 12;
+      const isTier1Escalated = (t.status === 'Escalated' || i === 2 || i === 21) && !isTier2Escalated;
+
+      // Status resolution
+      let status = t.status;
+      if (isReopened) status = 'In Progress';
+      if (isTier2Escalated || isTier1Escalated) status = 'Escalated';
+
+      let priority = t.priority;
+      if (isTier2Escalated) priority = 'Critical';
+
+      const hoursAllowed = SLA_HOURS[priority] || 96;
+      let createdAt = new Date(Date.now() - t.daysAgo * 24 * 60 * 60 * 1000);
       let dueAt;
-      if (t.overdue) {
-        // Force dueAt in past so overdue indicator is triggered
+      let warnedAtRisk = false;
+      let escalationLevel = 0;
+      let escalatedAt = null;
+
+      if (isAtRisk) {
+        // Position at ~82% of SLA window elapsed
+        createdAt = new Date(Date.now() - Math.floor(hoursAllowed * 0.82 * 3600 * 1000));
+        dueAt = new Date(createdAt.getTime() + (hoursAllowed * 3600 * 1000));
+        warnedAtRisk = true;
+      } else if (isTier2Escalated) {
+        // Exceeded by +60% past SLA window
+        createdAt = new Date(Date.now() - Math.floor(hoursAllowed * 1.65 * 3600 * 1000));
+        dueAt = new Date(createdAt.getTime() + (hoursAllowed * 3600 * 1000));
+        escalationLevel = 2;
+        escalatedAt = new Date(Date.now() - 14 * 3600 * 1000);
+      } else if (isTier1Escalated) {
+        // Past due date by 12 hours
+        createdAt = new Date(Date.now() - (hoursAllowed + 12) * 3600 * 1000);
+        dueAt = new Date(createdAt.getTime() + (hoursAllowed * 3600 * 1000));
+        escalationLevel = 1;
+        escalatedAt = new Date(Date.now() - 10 * 3600 * 1000);
+      } else if (status === 'Resolved' && i === 28) {
+        // Auto-close candidate (>7 days resolved without feedback)
+        createdAt = new Date(Date.now() - 14 * 24 * 3600 * 1000);
         dueAt = new Date(createdAt.getTime() + (hoursAllowed * 3600 * 1000));
       } else {
         dueAt = new Date(createdAt.getTime() + (hoursAllowed * 3600 * 1000));
@@ -605,7 +654,6 @@ const seedGrievances = async () => {
         ? `Officer reassigned category to "${t.category}" following physical ground inspection.`
         : '';
 
-      // A few needsManualReview examples (indices 7 and 25)
       const needsReview = Boolean(aiResult.needsManualReview || i === 7 || i === 25);
       const calibratedConfidence = (i === 7 || i === 25) ? 0.62 : aiResult.confidence;
 
@@ -642,7 +690,6 @@ const seedGrievances = async () => {
         createdAt: t0,
       });
 
-      // AI Classified timeline entry
       const confPercent = Math.round(aiAnalysisDoc.confidence * 100);
       timeline.push({
         status: 'AI Classified',
@@ -666,8 +713,8 @@ const seedGrievances = async () => {
         });
       }
 
-      if (t.status !== 'Submitted') {
-        const t1 = new Date(t0.getTime() + 15 * 60 * 1000); // 15 mins later
+      if (status !== 'Submitted') {
+        const t1 = new Date(t0.getTime() + 15 * 60 * 1000);
         timeline.push({
           status: 'Assigned',
           title: `Routed to ${dept.name}`,
@@ -678,7 +725,7 @@ const seedGrievances = async () => {
           createdAt: t1,
         });
 
-        const t2 = new Date(t1.getTime() + 10 * 60 * 1000); // 10 mins later
+        const t2 = new Date(t1.getTime() + 10 * 60 * 1000);
         timeline.push({
           status: 'Assigned',
           title: 'Assigned to Ward Nodal Officer',
@@ -690,8 +737,8 @@ const seedGrievances = async () => {
         });
       }
 
-      if (['In Progress', 'Awaiting Verification', 'Resolved', 'Closed', 'Escalated'].includes(t.status)) {
-        const t3 = new Date(t0.getTime() + 4 * 3600 * 1000); // 4 hours later
+      if (['In Progress', 'Awaiting Verification', 'Resolved', 'Closed', 'Escalated'].includes(status) || isReopened) {
+        const t3 = new Date(t0.getTime() + 4 * 3600 * 1000);
         timeline.push({
           status: 'In Progress',
           title: 'Field Investigation Initiated',
@@ -703,7 +750,7 @@ const seedGrievances = async () => {
         });
       }
 
-      if (t.status === 'Awaiting Verification') {
+      if (status === 'Awaiting Verification') {
         const t4 = new Date(t0.getTime() + 24 * 3600 * 1000);
         timeline.push({
           status: 'Awaiting Verification',
@@ -723,8 +770,17 @@ const seedGrievances = async () => {
         resolvedAt: null,
       };
 
-      if (['Resolved', 'Closed'].includes(t.status)) {
-        const resolvedAt = new Date(createdAt.getTime() + Math.min(hoursAllowed * 0.7, 36) * 3600 * 1000);
+      if (['Resolved', 'Closed'].includes(status) || isReopened) {
+        let resolvedAt;
+        if (status === 'Resolved' && i === 28) {
+          // 9 days ago for auto-close demo
+          resolvedAt = new Date(Date.now() - 9 * 24 * 3600 * 1000);
+        } else if (isReopened) {
+          resolvedAt = new Date(Date.now() - 3 * 24 * 3600 * 1000);
+        } else {
+          resolvedAt = new Date(createdAt.getTime() + Math.min(hoursAllowed * 0.7, 36) * 3600 * 1000);
+        }
+
         resolution = {
           summary: `Site rectification executed by ${dept.name} ward crew. Issue redressed and inspected per municipal standards.`,
           proofImages: [
@@ -745,7 +801,7 @@ const seedGrievances = async () => {
           createdAt: resolvedAt,
         });
 
-        if (t.status === 'Closed') {
+        if (status === 'Closed') {
           const closedAt = new Date(resolvedAt.getTime() + 12 * 3600 * 1000);
           timeline.push({
             status: 'Closed',
@@ -759,31 +815,59 @@ const seedGrievances = async () => {
         }
       }
 
-      if (t.status === 'Escalated') {
-        const escalatedAt = new Date(createdAt.getTime() + (hoursAllowed + 4) * 3600 * 1000);
+      // Reopen timeline entry
+      if (isReopened) {
+        const reopenedAt = new Date(Date.now() - 1.5 * 24 * 3600 * 1000);
         timeline.push({
-          status: 'Escalated',
-          title: 'Grievance Escalated (SLA Alert)',
-          note: `SLA window (${hoursAllowed} hours) exceeded without resolution. Escalated to Zonal Commissioner.`,
-          actor: null,
-          actorRole: 'system',
+          status: 'In Progress',
+          title: 'Grievance Reopened by Citizen - Dispute',
+          note: i === 0
+            ? 'Patchwork eroded immediately following morning showers. Deep hazardous cavity is exposed again.'
+            : 'Overhead pipe joint was clamped but high pressure leak resumed along the municipal wall.',
+          actor: citizen._id,
+          actorRole: 'citizen',
           isInternal: false,
-          createdAt: escalatedAt,
+          createdAt: reopenedAt,
         });
       }
 
-      // Add a realistic sample internal remark for some grievances
+      // Escalation timeline entries
+      if (isTier1Escalated || isTier2Escalated) {
+        timeline.push({
+          status: 'Escalated',
+          title: 'Grievance Escalated (Tier 1 SLA Breach)',
+          note: `SLA window (${hoursAllowed} hours) exceeded without verified resolution. Escalated to Department Head and Municipal Administrators.`,
+          actor: null,
+          actorRole: 'system',
+          isInternal: false,
+          createdAt: escalatedAt || new Date(createdAt.getTime() + hoursAllowed * 3600 * 1000),
+        });
+      }
+
+      if (isTier2Escalated) {
+        timeline.push({
+          status: 'Escalated',
+          title: 'Tier 2 Critical Escalation (SLA Overdue +50%)',
+          note: 'Unresolved past 150% of SLA duration. Ticket priority elevated to Critical and flagged for executive commissioner intervention.',
+          actor: null,
+          actorRole: 'system',
+          isInternal: false,
+          createdAt: new Date(escalatedAt.getTime() + 6 * 3600 * 1000),
+        });
+      }
+
+      // Remarks
       const remarks = [];
       if (i % 3 === 0) {
         remarks.push({
           author: assignedOfficer._id,
-          text: 'Coordinated with zonal inventory for required replacement parts and bitumen mix.',
+          text: 'Coordinated with zonal inventory for required replacement parts and materials.',
           isInternal: true,
           createdAt: new Date(createdAt.getTime() + 2 * 3600 * 1000),
         });
       }
 
-      // Attachments (sample mock civic photos)
+      // Attachments
       const attachments = [];
       if (i % 2 === 0) {
         attachments.push({
@@ -795,6 +879,17 @@ const seedGrievances = async () => {
         });
       }
 
+      // Feedback only for Closed
+      let feedback = {};
+      if (status === 'Closed') {
+        const sampleFeedback = FEEDBACK_LIST[i % FEEDBACK_LIST.length];
+        feedback = {
+          rating: sampleFeedback.rating,
+          comment: sampleFeedback.comment,
+          submittedAt: new Date(createdAt.getTime() + 36 * 3600 * 1000),
+        };
+      }
+
       grievanceDocs.push({
         trackingId,
         title: t.title,
@@ -803,8 +898,8 @@ const seedGrievances = async () => {
         category: t.category,
         department: dept._id,
         categorySource: isOverridden ? 'officer' : (aiResult.category === t.category ? 'ai' : 'citizen'),
-        priority: t.priority,
-        status: t.status,
+        priority,
+        status,
         aiAnalysis: aiAnalysisDoc,
         location: {
           address: locality.address,
@@ -813,24 +908,155 @@ const seedGrievances = async () => {
           coordinates: geo,
         },
         attachments,
-        assignedOfficer: t.status === 'Submitted' ? null : assignedOfficer._id,
+        assignedOfficer: status === 'Submitted' ? null : assignedOfficer._id,
         timeline,
         remarks,
         sla: {
           dueAt,
-          breached: Boolean(t.overdue || t.status === 'Escalated'),
-          escalationLevel: t.status === 'Escalated' ? 1 : 0,
-          escalatedAt: t.status === 'Escalated' ? new Date(createdAt.getTime() + 30 * 3600 * 1000) : null,
+          breached: Boolean(isTier1Escalated || isTier2Escalated || (status !== 'Resolved' && status !== 'Closed' && dueAt < new Date())),
+          escalationLevel,
+          escalatedAt,
+          warnedAtRisk,
         },
         resolution,
-        feedback: t.status === 'Closed' ? { rating: 5, comment: 'Quickly fixed, thank you ward team!', submittedAt: new Date() } : {},
+        feedback,
         createdAt,
         updatedAt: new Date(createdAt.getTime() + 24 * 3600 * 1000),
       });
     }
 
-    await Grievance.insertMany(grievanceDocs);
-    console.log(`✅ Successfully seeded ${grievanceDocs.length} realistic grievances across all 9 departments!`);
+    const savedGrievances = await Grievance.insertMany(grievanceDocs);
+    console.log(`✅ Successfully seeded ${savedGrievances.length} realistic grievances!`);
+
+    // 4. Seed realistic notifications
+    console.log('🔔 Generating realistic notifications across Citizens, Officers, and Admins...');
+    const adminUser = await User.findOne({ role: 'admin' });
+    const notificationDocs = [];
+
+    // Helper map of saved grievances by index
+    const gMap = savedGrievances;
+
+    // A. Notifications for Citizen 1 (Aarav Sharma)
+    const citizen1 = citizens[0];
+    const citizen1Grievances = savedGrievances.filter((g) => g.citizen.toString() === citizen1._id.toString());
+
+    if (citizen1Grievances.length > 0) {
+      const g0 = citizen1Grievances[0];
+      notificationDocs.push({
+        user: citizen1._id,
+        type: 'status_update',
+        title: `Status Updated: In Progress`,
+        message: `Your grievance ${g0.trackingId} has been updated to In Progress by field crew.`,
+        grievance: g0._id,
+        isRead: false,
+        createdAt: new Date(Date.now() - 2 * 3600 * 1000),
+      });
+
+      notificationDocs.push({
+        user: citizen1._id,
+        type: 'assignment',
+        title: `Grievance Routed`,
+        message: `Your grievance ${g0.trackingId} was routed to the department and assigned to a field officer.`,
+        grievance: g0._id,
+        isRead: true,
+        createdAt: new Date(Date.now() - 24 * 3600 * 1000),
+      });
+    }
+
+    // Citizen feedback requests for Resolved items
+    const resolvedGrievances = savedGrievances.filter((g) => g.status === 'Resolved');
+    resolvedGrievances.slice(0, 3).forEach((rg, idx) => {
+      notificationDocs.push({
+        user: rg.citizen,
+        type: 'feedback_request',
+        title: `Grievance Resolved: Please Rate Our Service`,
+        message: `Your grievance ${rg.trackingId} has been marked as resolved. Please submit your feedback or reopen if unsatisfied.`,
+        grievance: rg._id,
+        isRead: idx === 0 ? false : true,
+        createdAt: new Date(Date.now() - (idx + 1) * 12 * 3600 * 1000),
+      });
+    });
+
+    // B. Notifications for Roads Officer (roads.officer1)
+    const roadsOfficer = officers.find((o) => o.email === 'roads.officer1@civicsetu.gov.in') || officers[0];
+    const roadsGrievances = savedGrievances.filter(
+      (g) => g.assignedOfficer && g.assignedOfficer.toString() === roadsOfficer._id.toString()
+    );
+
+    if (roadsGrievances.length > 0) {
+      notificationDocs.push({
+        user: roadsOfficer._id,
+        type: 'assignment',
+        title: `New Grievance Assigned`,
+        message: `You have been assigned grievance ${roadsGrievances[0].trackingId}: "${roadsGrievances[0].title.slice(0, 50)}..."`,
+        grievance: roadsGrievances[0]._id,
+        isRead: false,
+        createdAt: new Date(Date.now() - 3 * 3600 * 1000),
+      });
+
+      notificationDocs.push({
+        user: roadsOfficer._id,
+        type: 'sla_warning',
+        title: `SLA Warning: Action Required`,
+        message: `Grievance ${roadsGrievances[0].trackingId} has elapsed over 75% of its SLA resolution window.`,
+        grievance: roadsGrievances[0]._id,
+        isRead: false,
+        createdAt: new Date(Date.now() - 1 * 3600 * 1000),
+      });
+
+      // Citizen dispute notification
+      notificationDocs.push({
+        user: roadsOfficer._id,
+        type: 'system',
+        title: `Grievance Reopened by Citizen`,
+        message: `Citizen disputed previous resolution on ${savedGrievances[0].trackingId}. Ticket status returned to In Progress.`,
+        grievance: savedGrievances[0]._id,
+        isRead: false,
+        createdAt: new Date(Date.now() - 30 * 60 * 1000),
+      });
+    }
+
+    // C. Notifications for Admin (Dr. Neha Patel)
+    if (adminUser) {
+      const escalatedTickets = savedGrievances.filter((g) => g.status === 'Escalated');
+
+      if (escalatedTickets.length > 0) {
+        notificationDocs.push({
+          user: adminUser._id,
+          type: 'escalation',
+          title: `Tier 1 SLA Breach Escalation`,
+          message: `Grievance ${escalatedTickets[0].trackingId} exceeded target resolution deadline without redressal.`,
+          grievance: escalatedTickets[0]._id,
+          isRead: false,
+          createdAt: new Date(Date.now() - 4 * 3600 * 1000),
+        });
+      }
+
+      const tier2Ticket = savedGrievances.find((g) => g.sla?.escalationLevel === 2);
+      if (tier2Ticket) {
+        notificationDocs.push({
+          user: adminUser._id,
+          type: 'escalation',
+          title: `🚨 Tier 2 Critical Escalation`,
+          message: `Ticket ${tier2Ticket.trackingId} has exceeded 150% of allowable SLA. Priority elevated to Critical for Commissioner review.`,
+          grievance: tier2Ticket._id,
+          isRead: false,
+          createdAt: new Date(Date.now() - 2 * 3600 * 1000),
+        });
+      }
+
+      notificationDocs.push({
+        user: adminUser._id,
+        type: 'system',
+        title: `Municipal System Ready`,
+        message: `SLA escalation engine and grievance tracking are fully initialized across 9 municipal departments.`,
+        isRead: true,
+        createdAt: new Date(Date.now() - 48 * 3600 * 1000),
+      });
+    }
+
+    await Notification.insertMany(notificationDocs);
+    console.log(`✅ Successfully seeded ${notificationDocs.length} notifications!`);
 
     // Status breakdown printout
     const statusCounts = {};

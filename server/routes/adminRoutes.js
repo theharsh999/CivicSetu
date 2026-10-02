@@ -13,6 +13,8 @@ import {
   getUsers,
   createUser,
   updateUser,
+  runSlaCheck,
+  simulateSlaBreach,
 } from '../controllers/adminController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { ROLES } from '../utils/constants.js';
@@ -26,6 +28,10 @@ router.use(authorize(ROLES.ADMIN));
 // Overview & Analytics
 router.get('/overview', getOverview);
 router.get('/analytics', getAnalytics);
+
+// SLA Engine & Demo Controls
+router.post('/sla/run-check', runSlaCheck);
+router.post('/sla/simulate-breach', simulateSlaBreach);
 
 // Grievance Management & Geospatial Map
 router.get('/grievances', getAllGrievances);

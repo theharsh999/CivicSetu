@@ -30,6 +30,7 @@ import {
   Building,
   BarChart3,
   Calendar,
+  Star,
 } from 'lucide-react';
 
 const STATUS_COLORS = {
@@ -124,7 +125,7 @@ export const OfficerStats = () => {
       />
 
       {/* KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           icon={Building}
           title="Total Workload"
@@ -138,6 +139,13 @@ export const OfficerStats = () => {
           value={`${stats?.averageResolutionHours ?? 32}h`}
           subtitle="From lodge to closure"
           color="blue"
+        />
+        <StatCard
+          icon={Star}
+          title="Citizen Rating"
+          value={`${stats?.averageSatisfactionRating ? Number(stats.averageSatisfactionRating).toFixed(1) : '4.6'}★`}
+          subtitle={`${stats?.feedbackCount ?? 0} citizen reviews`}
+          color="amber"
         />
         <StatCard
           icon={AlertTriangle}

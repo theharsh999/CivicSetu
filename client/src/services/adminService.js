@@ -69,6 +69,17 @@ export const adminService = {
     const res = await api.patch(`/admin/users/${id}`, data);
     return res.data?.data || res.data;
   },
+
+  // SLA Engine & Demo Controls
+  async runSlaCheck() {
+    const res = await api.post('/admin/sla/run-check');
+    return res.data?.data || res.data;
+  },
+
+  async simulateSlaBreach(grievanceId = null) {
+    const res = await api.post('/admin/sla/simulate-breach', { grievanceId });
+    return res.data?.data || res.data;
+  },
 };
 
 export default adminService;

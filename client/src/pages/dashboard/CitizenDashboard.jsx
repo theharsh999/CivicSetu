@@ -23,6 +23,7 @@ import {
   Phone,
   ArrowRight,
   TrendingUp,
+  Star,
 } from 'lucide-react';
 
 export const CitizenDashboard = () => {
@@ -90,6 +91,40 @@ export const CitizenDashboard = () => {
           </Link>
         }
       />
+
+      {/* Awaiting Feedback Prompt Banner (Prompt 7) */}
+      {recentGrievances.some((g) => g.status === 'Resolved' && !g.feedback?.rating) && (
+        (() => {
+          const unratedItem = recentGrievances.find((g) => g.status === 'Resolved' && !g.feedback?.rating);
+          const totalUnrated = recentGrievances.filter((g) => g.status === 'Resolved' && !g.feedback?.rating).length;
+          return (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
+                  <Star className="w-5 h-5 text-amber-100 fill-amber-100" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm">
+                    Action Required: Verify Resolution ({totalUnrated} Ticket{totalUnrated > 1 ? 's' : ''})
+                  </h4>
+                  <p className="text-xs text-amber-100 mt-0.5 leading-relaxed">
+                    Ticket <span className="font-mono font-bold">{unratedItem.trackingId}</span> ("{unratedItem.title}") was marked resolved by the department. Please inspect the field proof and submit your satisfaction rating.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white text-amber-900 hover:bg-amber-50 border-white shrink-0 font-bold"
+                onClick={() => navigate(`/dashboard/citizen/grievances/${unratedItem._id}`)}
+                rightIcon={<ArrowRight className="w-4 h-4" />}
+              >
+                Inspect & Rate
+              </Button>
+            </div>
+          );
+        })()
+      )}
 
       {/* Citizen Profile Banner */}
       <Card className="p-5 border-l-4 border-l-brand-600 bg-gradient-to-r from-brand-50/40 via-white to-white dark:from-brand-950/20 dark:via-slate-900 dark:to-slate-900">

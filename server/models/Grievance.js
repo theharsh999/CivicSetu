@@ -223,6 +223,10 @@ const grievanceSchema = new mongoose.Schema(
         type: Date,
         default: null,
       },
+      warnedAtRisk: {
+        type: Boolean,
+        default: false,
+      },
     },
     resolution: {
       summary: {

@@ -11,7 +11,11 @@ import Skeleton from '../../components/ui/Skeleton';
 import ErrorState from '../../components/ui/ErrorState';
 import Modal from '../../components/ui/Modal';
 import StatusTimeline from '../../components/grievance/StatusTimeline';
-import LocationPicker from '../../components/grievance/LocationPicker';
+import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
+import Textarea from '../../components/ui/Textarea';
+import SlaBadge from '../../components/ui/SlaBadge';
+import { formatExpectedDate } from '../../utils/dateUtils';
 import {
   ArrowLeft,
   Copy,
@@ -31,17 +35,31 @@ import {
   Mail,
   Sparkles,
   Cpu,
+  RotateCcw,
+  ThumbsUp,
+  AlertCircle,
 } from 'lucide-react';
 
 export const GrievanceDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
+  const { user } = useAuth();
 
   const [grievance, setGrievance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [activeImage, setActiveImage] = useState(null);
+
+  // Feedback and Reopen state
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [reopenModalOpen, setReopenModalOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
+  const [isReopening, setIsReopening] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     setLoading(true);
@@ -65,6 +83,45 @@ export const GrievanceDetail = () => {
       navigator.clipboard.writeText(grievance.trackingId);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!feedbackRating) {
+      toast.error('Please select a rating between 1 and 5 stars');
+      return;
+    }
+    setIsSubmittingFeedback(true);
+    try {
+      const res = await grievanceService.submitFeedback(grievance._id, {
+        rating: feedbackRating,
+        comment: feedbackComment.trim(),
+      });
+      setGrievance(res.data?.grievance || res.data);
+      toast.success('Thank you! Your feedback has been recorded and this ticket is officially closed.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to submit feedback');
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
+  const handleReopen = async () => {
+    if (!reopenReason.trim()) {
+      toast.error('A reason is required to dispute resolution and reopen this grievance.');
+      return;
+    }
+    setIsReopening(true);
+    try {
+      const res = await grievanceService.reopenGrievance(grievance._id, reopenReason.trim());
+      setGrievance(res.data?.grievance || res.data);
+      setReopenModalOpen(false);
+      setReopenReason('');
+      toast.info('Grievance reopened. Status reverted to In Progress.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reopen grievance');
+    } finally {
+      setIsReopening(false);
     }
   };
 
@@ -341,24 +398,213 @@ export const GrievanceDetail = () => {
               </div>
             </div>
           )}
-          {/* PROMPT 7 PLACEHOLDER: Citizen Feedback */}
-          <div className="p-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 text-xs text-slate-500 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-              <Star className="w-4 h-4" />
+          {/* Citizen Feedback & Verification Section */}
+          {grievance.feedback?.rating ? (
+            /* Read-Only Citizen Satisfaction Feedback */
+            <Card className="p-5 border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/20 dark:bg-emerald-950/10">
+              <CardHeader className="p-0 pb-3 mb-3 border-b border-emerald-100 dark:border-emerald-900/40">
+                <CardTitle className="text-sm flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
+                    <ThumbsUp className="w-4 h-4 text-emerald-600" />
+                    <span>Citizen Satisfaction Feedback</span>
+                  </div>
+                  {grievance.feedback.submittedAt && (
+                    <span className="text-[11px] font-normal text-slate-400">
+                      Submitted on {formatDate(grievance.feedback.submittedAt)}
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`w-5 h-5 ${
+                          star <= grievance.feedback.rating
+                            ? 'text-amber-400 fill-amber-400'
+                            : 'text-slate-300 dark:text-slate-700'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    {grievance.feedback.rating} out of 5 stars
+                  </span>
+                </div>
+
+                {grievance.feedback.comment && (
+                  <blockquote className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs italic text-slate-700 dark:text-slate-300">
+                    "{grievance.feedback.comment}"
+                  </blockquote>
+                )}
+
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Resolution verified by citizen. Ticket permanently archived.</span>
+                </div>
+              </div>
+            </Card>
+          ) : grievance.status === 'Resolved' && user?.role === 'citizen' ? (
+            /* Interactive Feedback Form (Resolved & Unrated) */
+            <Card className="p-5 border-amber-200 dark:border-amber-900/60 bg-gradient-to-br from-amber-50/30 via-white to-white dark:from-amber-950/20 dark:via-slate-900 dark:to-slate-900 shadow-md">
+              <CardHeader className="p-0 pb-3 mb-3 border-b border-amber-100 dark:border-amber-900/40">
+                <CardTitle className="text-sm flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-amber-900 dark:text-amber-200 font-bold">
+                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                    <span>Resolution Verification & Rating</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                    Awaiting Citizen Sign-off
+                  </span>
+                </CardTitle>
+              </CardHeader>
+
+              <div className="space-y-4">
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Field officers have completed the work and marked your grievance as{' '}
+                  <strong className="text-emerald-600 dark:text-emerald-400">Resolved</strong>. Please review the
+                  resolution proof above and rate your satisfaction.
+                </p>
+
+                {/* 5-Star Interactive Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    How satisfied are you with the redressal?
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      {[1, 2, 3, 4, 5].map((s) => {
+                        const activeVal = hoveredRating || feedbackRating;
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setFeedbackRating(s)}
+                            onMouseEnter={() => setHoveredRating(s)}
+                            onMouseLeave={() => setHoveredRating(0)}
+                            className="p-1 hover:scale-110 transition-transform focus:outline-hidden"
+                            title={`${s} Star${s > 1 ? 's' : ''}`}
+                          >
+                            <Star
+                              className={`w-7 h-7 transition-colors ${
+                                s <= activeVal
+                                  ? 'text-amber-400 fill-amber-400 drop-shadow-xs'
+                                  : 'text-slate-300 dark:text-slate-700'
+                              }`}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 min-w-[120px]">
+                      {feedbackRating === 5 && '★★★★★ Excellent'}
+                      {feedbackRating === 4 && '★★★★☆ Very Good'}
+                      {feedbackRating === 3 && '★★★☆☆ Satisfactory'}
+                      {feedbackRating === 2 && '★★☆☆☆ Below expectations'}
+                      {feedbackRating === 1 && '★☆☆☆☆ Poor / Incomplete'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Optional Feedback Remark */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Comments or notes for the municipal department (optional):
+                  </label>
+                  <Textarea
+                    rows={2}
+                    value={feedbackComment}
+                    onChange={(e) => setFeedbackComment(e.target.value)}
+                    placeholder="e.g. Footpath was fixed cleanly, thank you to the Roads squad!"
+                    className="text-xs"
+                  />
+                </div>
+
+                {/* Form Actions: Satisfied Close & Dispute Reopen */}
+                <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    onClick={handleSubmitFeedback}
+                    isLoading={isSubmittingFeedback}
+                    leftIcon={<ThumbsUp className="w-4 h-4" />}
+                  >
+                    Satisfied — Accept & Close
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                    onClick={() => setReopenModalOpen(true)}
+                    leftIcon={<RotateCcw className="w-4 h-4" />}
+                  >
+                    Not Resolved — Dispute & Reopen
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ) : grievance.status === 'Closed' ? (
+            <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-xs text-slate-500 flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+              <span>This grievance has been officially closed and archived in municipal records.</span>
             </div>
-            <div>
-              <h5 className="font-semibold text-slate-800 dark:text-slate-200">
-                Citizen Satisfaction & Rating (Prompt 7 Citizen Feedback)
-              </h5>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Upon ticket resolution, citizens can rate resolution quality (1 to 5 stars) and submit feedback before permanent archive.
-              </p>
+          ) : (
+            <div className="p-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/40 text-xs text-slate-500 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <Star className="w-4 h-4" />
+              </div>
+              <div>
+                <h5 className="font-semibold text-slate-800 dark:text-slate-200">
+                  Citizen Satisfaction Rating
+                </h5>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Upon field completion and status change to "Resolved", you can rate resolution quality and confirm closure.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Right Column: Timeline & Assigned Officer (4 Cols) */}
+        {/* Right Column: SLA Target, Assigned Officer & Timeline (4 Cols) */}
         <div className="lg:col-span-4 space-y-6">
+          {/* Statutory SLA Target Card */}
+          <Card className="p-5">
+            <CardHeader className="p-0 pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-brand-600" />
+                  <span>Statutory SLA Target</span>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  {grievance.priority} Priority
+                </span>
+              </CardTitle>
+            </CardHeader>
+
+            <div className="space-y-3">
+              <SlaBadge grievance={grievance} showProgress={true} className="w-full" />
+              <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1.5 pt-1 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex justify-between items-center">
+                  <span>Resolution Target:</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 font-mono text-[11px]">
+                    {formatDate(grievance.sla?.dueAt)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span>Timeline Status:</span>
+                  <span className="font-medium text-brand-600 dark:text-brand-400">
+                    {formatExpectedDate(grievance.sla?.dueAt)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Card>
+
           {/* Assigned Officer Card */}
           <Card className="p-5">
             <CardHeader className="p-0 pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
@@ -481,6 +727,61 @@ export const GrievanceDetail = () => {
           <div className="mt-3 flex justify-end w-full">
             <Button variant="outline" size="sm" onClick={() => setActiveImage(null)}>
               Close Preview
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Citizen Dispute / Reopen Modal */}
+      <Modal
+        isOpen={reopenModalOpen}
+        onClose={() => !isReopening && setReopenModalOpen(false)}
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-white font-display">
+              Dispute Resolution & Reopen Grievance
+            </h3>
+          </div>
+
+          <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
+            <strong>7-Day Dispute Window:</strong> Grievance tickets may be reopened if field work was inadequate, incomplete, or the issue recurred.
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Reason for disputing resolution <span className="text-rose-500">*</span>:
+            </label>
+            <Textarea
+              rows={3}
+              value={reopenReason}
+              onChange={(e) => setReopenReason(e.target.value)}
+              placeholder="Please provide specific details (e.g. Water is still muddy and pressure is low; potholes were only half covered)."
+              className="text-xs"
+              required
+            />
+          </div>
+
+          <div className="pt-2 flex items-center justify-end gap-2.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReopenModalOpen(false)}
+              disabled={isReopening}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              onClick={handleReopen}
+              isLoading={isReopening}
+              leftIcon={<RotateCcw className="w-4 h-4" />}
+            >
+              Confirm Reopen
             </Button>
           </div>
         </div>

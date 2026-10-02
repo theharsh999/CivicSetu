@@ -8,6 +8,7 @@ import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import PriorityBadge from '../../components/ui/PriorityBadge';
+import SlaBadge from '../../components/ui/SlaBadge';
 import Skeleton from '../../components/ui/Skeleton';
 import EmptyState from '../../components/ui/EmptyState';
 import ErrorState from '../../components/ui/ErrorState';
@@ -107,6 +108,33 @@ export const CitizenGrievances = () => {
           </Link>
         }
       />
+
+      {/* Quick Filter Tabs (Prompt 7) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        {[
+          { id: 'all', label: 'All Complaints' },
+          { id: 'In Progress', label: 'In Progress' },
+          { id: 'Resolved', label: 'Resolved (Awaiting Review)' },
+          { id: 'Closed', label: 'Closed & Archived' },
+          { id: 'Escalated', label: 'Escalated' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => {
+              setSelectedStatus(tab.id);
+              setCurrentPage(1);
+            }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+              selectedStatus === tab.id
+                ? 'bg-brand-600 text-white shadow-xs'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       {/* Filter & Search Bar */}
       <Card className="p-4 shadow-subtle space-y-3">
@@ -258,6 +286,7 @@ export const CitizenGrievances = () => {
                   <th className="py-3 px-4">Department</th>
                   <th className="py-3 px-4">Priority</th>
                   <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">SLA Target</th>
                   <th className="py-3 px-4">Date</th>
                   <th className="py-3 px-4 text-right">Action</th>
                 </tr>
@@ -292,6 +321,9 @@ export const CitizenGrievances = () => {
                     </td>
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <StatusBadge status={g.status} size="sm" />
+                    </td>
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <SlaBadge grievance={g} />
                     </td>
                     <td className="py-3.5 px-4 whitespace-nowrap text-slate-400 font-mono">
                       {formatDate(g.createdAt)}

@@ -5,6 +5,8 @@ import {
   getGrievanceById,
   trackPublicGrievance,
   getMyStats,
+  submitFeedback,
+  reopenGrievance,
 } from '../controllers/grievanceController.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { uploadGrievanceImages } from '../middleware/upload.js';
@@ -28,6 +30,8 @@ router.post(
 
 router.get('/my', authorize(ROLES.CITIZEN), getMyGrievances);
 router.get('/my/stats', authorize(ROLES.CITIZEN), getMyStats);
+router.post('/:id/feedback', authorize(ROLES.CITIZEN), submitFeedback);
+router.post('/:id/reopen', authorize(ROLES.CITIZEN), reopenGrievance);
 
 // Grievance detail by ID (Protected for owner citizen, officer, or admin)
 router.get('/:id', getGrievanceById);

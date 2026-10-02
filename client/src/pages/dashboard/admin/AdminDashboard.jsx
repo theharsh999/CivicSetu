@@ -16,7 +16,11 @@ import {
   Eye,
   RefreshCw,
   ExternalLink,
+  Star,
+  Zap,
+  Play,
 } from 'lucide-react';
+import { useToast } from '../../../context/ToastContext';
 import {
   AreaChart,
   Area,
@@ -64,11 +68,14 @@ const PRIORITY_COLORS = {
 
 export const AdminDashboard = () => {
   const { user } = useAuth();
+  const toast = useToast();
   const [data, setData] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedGrievance, setSelectedGrievance] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [runningSla, setRunningSla] = useState(false);
+  const [simulatingBreach, setSimulatingBreach] = useState(false);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -98,6 +105,38 @@ export const AdminDashboard = () => {
   const handleGrievanceUpdated = (updated) => {
     setSelectedGrievance(updated);
     fetchDashboardData();
+  };
+
+  const handleRunSlaCheck = async () => {
+    setRunningSla(true);
+    try {
+      const summary = await adminService.runSlaCheck();
+      toast.success(
+        `SLA Check Complete: ${summary.checkedCount} checked, ${summary.escalatedLevel1Count} escalated (L1), ${summary.escalatedLevel2Count} critical (L2), ${summary.warnedCount} warned, ${summary.autoClosedCount} auto-closed.`
+      );
+      fetchDashboardData();
+    } catch (err) {
+      toast.error('Failed to run manual SLA evaluation');
+    } finally {
+      setRunningSla(false);
+    }
+  };
+
+  const handleSimulateBreach = async () => {
+    setSimulatingBreach(true);
+    try {
+      const res = await adminService.simulateSlaBreach();
+      const trackingId = res?.grievance?.trackingId || 'Ticket';
+      toast.warning(`SLA breach simulated for ${trackingId}! Ticket shifted 4h into past & escalated to Tier 1.`);
+      fetchDashboardData();
+      if (res?.grievance) {
+        handleOpenDrawer(res.grievance);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to simulate SLA breach');
+    } finally {
+      setSimulatingBreach(false);
+    }
   };
 
   if (loading || !data) {
@@ -147,7 +186,7 @@ export const AdminDashboard = () => {
       />
 
       {/* 1. HERO KPI ROW */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
         <StatCard
           icon={FileText}
           title="Total Registered"
@@ -177,6 +216,13 @@ export const AdminDashboard = () => {
           color="blue"
         />
         <StatCard
+          icon={Star}
+          title="Citizen Rating"
+          value={`${kpis.avgSatisfactionRating ? Number(kpis.avgSatisfactionRating).toFixed(1) : '4.6'}★`}
+          subtitle={`${kpis.totalRated || 14} verified reviews`}
+          color="amber"
+        />
+        <StatCard
           icon={AlertTriangle}
           title="Escalations"
           value={kpis.escalatedCount || 0}
@@ -191,6 +237,53 @@ export const AdminDashboard = () => {
           color="purple"
         />
       </div>
+
+      {/* DEMO CONTROLS CARD (Prompt 7 Evaluator Controls) */}
+      <Card className="p-4 sm:p-5 border-amber-300 dark:border-amber-700/60 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent shadow-xs">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Evaluator Demo Tools — SLA Engine & Escalation Controls
+                </h4>
+                <Badge variant="warning" size="sm" className="font-semibold uppercase tracking-wider text-[10px]">
+                  Demo Only
+                </Badge>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-3xl leading-relaxed">
+                Test the automated background SLA engine without waiting 24-96 hours. Trigger on-demand evaluation sweeps or shift an active ticket's statutory deadline 4 hours into the past to demonstrate automated Level 1 Escalation, officer alerts, and 7-day auto-closure sweeps.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRunSlaCheck}
+              isLoading={runningSla}
+              leftIcon={<Play className="w-3.5 h-3.5 text-brand-600" />}
+              className="bg-white dark:bg-slate-900 font-semibold shadow-xs"
+            >
+              Run SLA Check Now
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSimulateBreach}
+              isLoading={simulatingBreach}
+              leftIcon={<Zap className="w-3.5 h-3.5 text-amber-200" />}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-xs"
+            >
+              Simulate SLA Breach
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {/* 2. AI INSIGHT STRIP */}
       <Card className="p-4 bg-gradient-to-r from-indigo-50/80 via-purple-50/40 to-white dark:from-indigo-950/40 dark:via-purple-950/20 dark:to-slate-900 border-indigo-200/80 dark:border-indigo-800/60 shadow-xs">

@@ -3,6 +3,7 @@ dotenv.config();
 
 import app from './app.js';
 import { connectDB } from './config/db.js';
+import { startEscalationJob } from './jobs/escalationJob.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -10,6 +11,9 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   // Connect to database
   await connectDB();
+
+  // Start background cron jobs
+  startEscalationJob();
 
   const server = app.listen(PORT, () => {
     console.log(`\n=================================================`);

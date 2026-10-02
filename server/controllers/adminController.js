@@ -5,6 +5,8 @@ import User from '../models/User.js';
 import { getAdminOverviewStats, getAdminAnalyticsData } from '../services/analyticsService.js';
 import { applyTransition } from '../services/workflowService.js';
 import { findLeastLoadedOfficer } from '../services/routingService.js';
+import { runEscalationCheck } from '../jobs/escalationJob.js';
+import { notifyAssignment } from '../services/notificationService.js';
 import { apiResponse } from '../utils/apiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -225,6 +227,14 @@ export const reassignGrievance = asyncHandler(async (req, res) => {
   });
 
   await grievance.save();
+
+  if (targetOfficer) {
+    try {
+      await notifyAssignment(targetOfficer._id, grievance, targetDept.name);
+    } catch (nErr) {
+      console.error('Notification error on reassignment:', nErr.message);
+    }
+  }
 
   const populated = await Grievance.findById(id)
     .populate('department', 'name code color icon')
@@ -577,6 +587,57 @@ export const updateUser = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Trigger manual SLA escalation check sweep
+ * @route   POST /api/admin/sla/run-check
+ * @access  Private (Admin)
+ */
+export const runSlaCheck = asyncHandler(async (req, res) => {
+  const summary = await runEscalationCheck();
+  return apiResponse(res, 200, 'SLA escalation check completed successfully', summary);
+});
+
+/**
+ * @desc    Demo tool: Simulate SLA breach by shifting dueAt into the past and running check
+ * @route   POST /api/admin/sla/simulate-breach
+ * @access  Private (Admin)
+ */
+export const simulateSlaBreach = asyncHandler(async (req, res) => {
+  const { grievanceId } = req.body;
+
+  let grievance;
+  if (grievanceId) {
+    grievance = await Grievance.findById(grievanceId);
+  } else {
+    // Pick an active grievance that isn't yet Escalated or Closed
+    grievance = await Grievance.findOne({
+      status: { $in: ['Assigned', 'In Progress', 'Submitted'] },
+    }).sort({ createdAt: -1 });
+  }
+
+  if (!grievance) {
+    throw new ApiError(404, 'No active candidate grievance available to simulate breach.');
+  }
+
+  // Shift SLA dueAt 4 hours into the past
+  grievance.sla = grievance.sla || {};
+  grievance.sla.dueAt = new Date(Date.now() - 4 * 60 * 60 * 1000);
+  grievance.sla.warnedAtRisk = true;
+  await grievance.save();
+
+  // Run escalation check immediately
+  const checkSummary = await runEscalationCheck();
+
+  const updatedGrievance = await Grievance.findById(grievance._id)
+    .populate('department', 'name code color icon')
+    .populate('assignedOfficer', 'name designation phone email avatar');
+
+  return apiResponse(res, 200, `SLA breach simulated for ticket ${grievance.trackingId}`, {
+    grievance: updatedGrievance,
+    checkSummary,
+  });
+});
+
 export default {
   getOverview,
   getAnalytics,
@@ -591,4 +652,6 @@ export default {
   getUsers,
   createUser,
   updateUser,
+  runSlaCheck,
+  simulateSlaBreach,
 };
